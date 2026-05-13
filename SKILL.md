@@ -1,5 +1,7 @@
 # image-vision-mcp Claude Code Install Skill
 
+[中文](./SKILL.zh-CN.md)
+
 Use this guide to install `image-vision-mcp` from the release zip without running `npm install`, `bun install`, or any platform-specific installer script.
 
 ## What The Release Contains
@@ -89,9 +91,11 @@ claude mcp add -s user \
   -e ANTHROPIC_AUTH_TOKEN=your-token \
   -e ANTHROPIC_BASE_URL=https://your-compatible-endpoint \
   -e QWEN_MODEL=openai/qwen3.6-plus \
-  -e ANTHROPIC_MODEL=claude-3-5-sonnet-latest \
+  -e ANTHROPIC_MODEL=your-diagnostic-text-model \
   image-vision -- node /absolute/path/to/image-vision-mcp/dist/index.js
 ```
+
+`ANTHROPIC_MODEL` is only used for optional error diagnosis. It does not have to be a Claude model; use any text model supported by your configured Anthropic-compatible endpoint.
 
 ## Remove
 

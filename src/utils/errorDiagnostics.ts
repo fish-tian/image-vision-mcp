@@ -33,7 +33,7 @@ export async function buildErrorResponse(
     'Local diagnosis:',
     localDiagnosis,
     '',
-    'Additional Anthropic model analysis:',
+    'Additional model-assisted diagnosis:',
     modelAnalysis,
     '',
     'Instruction for Claude Code:',
@@ -188,6 +188,7 @@ function buildDiagnosticPrompt(
   return [
     'You are diagnosing an Image Vision MCP server tool failure.',
     'Give a concise diagnosis for Claude Code to show to the user.',
+    'The diagnostic model may be any text model reachable through the configured Anthropic-compatible SDK endpoint; do not assume it is Claude.',
     'Do not expose secrets, tokens, image base64, or long stack traces.',
     'Do not claim certainty beyond the provided error details.',
     'Return 2-4 bullet points covering likely cause, suggested fix, and what to ask the user.',

@@ -12,6 +12,7 @@ The current release strategy is:
 - Ship a minimal `package.json` containing `"type": "module"`.
 - Ship `config.example.json` for user configuration.
 - Ship `SKILL.md` as the installation guide.
+- Ship `README.zh-CN.md` and `SKILL.zh-CN.md` for Chinese users.
 - Avoid platform-specific installer scripts such as `.ps1` and `.sh`.
 
 ## Runtime Configuration
@@ -64,7 +65,7 @@ The config file shape is:
 Important distinction:
 
 - `QWEN_MODEL` / `api.model` is used for image analysis.
-- `ANTHROPIC_MODEL` / `diagnostics.model` is used only for optional error diagnosis.
+- `ANTHROPIC_MODEL` / `diagnostics.model` is used only for optional error diagnosis. The name is kept for compatibility with the SDK configuration, but the value does not have to be a Claude model; it can be any compatible text model accepted by the configured endpoint.
 
 ## Key Code Paths
 
@@ -72,7 +73,7 @@ Important distinction:
 - `src/utils/qwenApi.ts`: reads API token, base URL, image model, max tokens, and default prompt.
 - `src/utils/cache.ts`: reads cache directory, TTL, max size, and lock timeout.
 - `src/utils/imageReader.ts`: reads image fetch timeout and max image size.
-- `src/utils/errorDiagnostics.ts`: builds local and optional Anthropic model-assisted error diagnostics.
+- `src/utils/errorDiagnostics.ts`: builds local and optional model-assisted error diagnostics through the configured SDK endpoint.
 - `src/index.ts`: catches MCP tool errors and returns the diagnostic response.
 
 ## Release Packaging
@@ -99,7 +100,9 @@ The zip contains:
 
 ```text
 README.md
+README.zh-CN.md
 SKILL.md
+SKILL.zh-CN.md
 config.example.json
 dist/index.js
 package.json

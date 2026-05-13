@@ -1,5 +1,7 @@
 # image-vision-mcp
 
+[中文](./README.zh-CN.md)
+
 An MCP server that exposes image analysis through a single `analyze_image` tool. It supports first-pass analysis for one or more images, then follow-up questions through a cached `session_id`.
 
 ## Features
@@ -105,7 +107,7 @@ Supported environment variables:
 | --- | --- | --- | --- |
 | `ANTHROPIC_AUTH_TOKEN` | Yes | none | API token used by `@anthropic-ai/sdk`. |
 | `ANTHROPIC_BASE_URL` | No | SDK default | Anthropic-compatible API base URL. |
-| `ANTHROPIC_MODEL` | No | none | Anthropic text model used only for model-assisted error diagnosis. |
+| `ANTHROPIC_MODEL` | No | none | Text model used only for model-assisted error diagnosis through the configured Anthropic-compatible SDK endpoint. |
 | `QWEN_MODEL` | No | `openai/qwen3.6-plus` | Model identifier used for image analysis. |
 | `IMAGE_VISION_CONFIG` | No | `~/.image-vision-mcp/config.json` | Custom config file path. |
 | `VISION_MAX_TOKENS` | No | `64000` | Maximum output tokens. |
@@ -117,11 +119,11 @@ Supported environment variables:
 | `IMAGE_FETCH_TIMEOUT_MS` | No | `30000` | Remote image fetch timeout. |
 | `IMAGE_MAX_BYTES` | No | `20971520` | Maximum image size in bytes. |
 | `LOG_LEVEL` | No | `info` | `debug`, `info`, `warn`, or `error`. |
-| `DIAGNOSTICS_ENABLED` | No | `true` | Enable local and optional Anthropic model-assisted error diagnosis. |
-| `DIAGNOSTICS_MAX_TOKENS` | No | `1000` | Maximum output tokens for Anthropic error diagnosis. |
-| `DIAGNOSTICS_TIMEOUT_MS` | No | `8000` | Timeout for Anthropic error diagnosis. |
+| `DIAGNOSTICS_ENABLED` | No | `true` | Enable local and optional model-assisted error diagnosis. |
+| `DIAGNOSTICS_MAX_TOKENS` | No | `1000` | Maximum output tokens for model-assisted error diagnosis. |
+| `DIAGNOSTICS_TIMEOUT_MS` | No | `8000` | Timeout for model-assisted error diagnosis. |
 
-`QWEN_MODEL` is used for image analysis. `ANTHROPIC_MODEL` is separate and used only to explain failures before the MCP tool returns an error to Claude Code.
+`QWEN_MODEL` is used for image analysis. `ANTHROPIC_MODEL` is separate and used only to explain failures before the MCP tool returns an error to Claude Code. Despite the environment variable name, this diagnostic model does not have to be a Claude model; it can be any compatible text model accepted by your configured endpoint.
 
 Empty strings in `config.json` are treated as unset and do not override environment variables.
 

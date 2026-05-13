@@ -70,13 +70,13 @@ describe('error diagnostics', () => {
     expect(createMock).not.toHaveBeenCalled();
   });
 
-  test('configured ANTHROPIC_MODEL calls Anthropic SDK and includes analysis', async () => {
+  test('configured ANTHROPIC_MODEL calls diagnostic model through SDK and includes analysis', async () => {
     await writeJson(tempConfigPath, {
       api: {
         authToken: 'test-token',
       },
       diagnostics: {
-        model: 'claude-diagnostic',
+        model: 'diagnostic-model',
         maxTokens: 123,
       },
     });
@@ -88,7 +88,7 @@ describe('error diagnostics', () => {
     );
 
     expect(createMock).toHaveBeenCalledTimes(1);
-    expect(createMock.mock.calls[0][0].model).toBe('claude-diagnostic');
+    expect(createMock.mock.calls[0][0].model).toBe('diagnostic-model');
     expect(createMock.mock.calls[0][0].max_tokens).toBe(123);
     expect(text).toContain('- Model cause: mocked diagnostic.');
   });
@@ -102,7 +102,7 @@ describe('error diagnostics', () => {
         authToken: 'test-token',
       },
       diagnostics: {
-        model: 'claude-diagnostic',
+        model: 'diagnostic-model',
       },
     });
     resetConfigForTests();

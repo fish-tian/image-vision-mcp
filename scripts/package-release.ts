@@ -20,7 +20,9 @@ const CRC_TABLE = createCrcTable();
 
 const releaseFiles = [
   'README.md',
+  'README.zh-CN.md',
   'SKILL.md',
+  'SKILL.zh-CN.md',
   'config.example.json',
   'dist/index.js',
 ];

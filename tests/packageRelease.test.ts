@@ -7,6 +7,8 @@ describe('release package manifest', () => {
 
     expect(script).toContain('config.example.json');
     expect(script).toContain('SKILL.md');
+    expect(script).toContain('SKILL.zh-CN.md');
+    expect(script).toContain('README.zh-CN.md');
     expect(script).toContain('dist/index.js');
     expect(script).toContain('package.json');
     expect(script).not.toContain('install-claude-code.ps1');

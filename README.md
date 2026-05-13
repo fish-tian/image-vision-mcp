@@ -44,10 +44,10 @@ chmod +x ./install-claude-code.sh
 ANTHROPIC_AUTH_TOKEN="your-token" ./install-claude-code.sh
 ```
 
-The installer registers the server with Claude Code:
+The installer writes `~/.image-vision-mcp/config.json`, then registers the server with Claude Code:
 
 ```bash
-claude mcp add -s user -e ANTHROPIC_AUTH_TOKEN=your-token image-vision -- node /path/to/dist/index.js
+claude mcp add -s user image-vision -- node /path/to/dist/index.js
 ```
 
 See [INSTALL_CLAUDE_CODE.md](./INSTALL_CLAUDE_CODE.md) for detailed steps. If you want Claude Code to install it for you, copy the prompt in [CLAUDECODE_INSTALL_PROMPT.md](./CLAUDECODE_INSTALL_PROMPT.md).
@@ -60,13 +60,66 @@ bun install
 
 ## Configuration
 
-Environment variables:
+The default user config file is:
+
+```text
+~/.image-vision-mcp/config.json
+```
+
+Edit this file after installation to change the API token, base URL, model, cache limits, image limits, or log level. You do not need to reinstall the MCP server after editing it.
+
+Example:
+
+```json
+{
+  "api": {
+    "authToken": "your-token",
+    "baseUrl": "https://your-compatible-endpoint",
+    "model": "openai/qwen3.6-plus",
+    "maxTokens": 64000,
+    "defaultPrompt": "Please analyze the image content."
+  },
+  "cache": {
+    "dir": "~/.image-vision-cache",
+    "ttlHours": 24,
+    "maxMb": 500,
+    "lockTimeoutMs": 5000
+  },
+  "image": {
+    "fetchTimeoutMs": 30000,
+    "maxBytes": 20971520
+  },
+  "log": {
+    "level": "info"
+  }
+}
+```
+
+Configuration priority:
+
+```text
+environment variables > config.json > built-in defaults
+```
+
+Set `IMAGE_VISION_CONFIG` to use a custom config path.
+
+Supported environment variables:
 
 | Variable | Required | Default | Description |
 | --- | --- | --- | --- |
 | `ANTHROPIC_AUTH_TOKEN` | Yes | none | API token used by `@anthropic-ai/sdk`. |
 | `ANTHROPIC_BASE_URL` | No | SDK default | Anthropic-compatible API base URL. |
 | `QWEN_MODEL` | No | `openai/qwen3.6-plus` | Model identifier used for image analysis. |
+| `IMAGE_VISION_CONFIG` | No | `~/.image-vision-mcp/config.json` | Custom config file path. |
+| `VISION_MAX_TOKENS` | No | `64000` | Maximum output tokens. |
+| `VISION_DEFAULT_PROMPT` | No | `Please analyze the image content.` | Prompt used when `prompt` is omitted. |
+| `IMAGE_VISION_CACHE_DIR` | No | `~/.image-vision-cache` | Cache directory. |
+| `CACHE_TTL_HOURS` | No | `24` | Session expiration window. |
+| `CACHE_MAX_MB` | No | `500` | Cache pressure cleanup threshold. |
+| `CACHE_LOCK_TIMEOUT_MS` | No | `5000` | Session lock timeout. |
+| `IMAGE_FETCH_TIMEOUT_MS` | No | `30000` | Remote image fetch timeout. |
+| `IMAGE_MAX_BYTES` | No | `20971520` | Maximum image size in bytes. |
+| `LOG_LEVEL` | No | `info` | `debug`, `info`, `warn`, or `error`. |
 
 PowerShell example:
 

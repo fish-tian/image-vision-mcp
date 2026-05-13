@@ -25,6 +25,7 @@ const releaseFiles = [
   'install-claude-code.ps1',
   'install-claude-code.sh',
   '.env.example',
+  'config.example.json',
   'dist/index.js',
 ];
 

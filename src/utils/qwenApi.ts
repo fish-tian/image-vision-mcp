@@ -9,27 +9,27 @@ import {
   withLock,
   type StoredMessageParam,
 } from './cache.js';
+import { getConfig } from './config.js';
 import { ApiError, CacheError } from './errors.js';
 import { readImageSource } from './imageReader.js';
 import { logger } from './logger.js';
 
-const DEFAULT_MODEL = 'openai/qwen3.6-plus';
-const DEFAULT_PROMPT = '请分析图片内容。';
-
 export async function analyzeImage(
   sources: string[] | null,
   sessionId: string | null,
-  prompt = DEFAULT_PROMPT,
+  prompt?: string,
 ): Promise<{ result: string; session_id: string }> {
+  const effectivePrompt = prompt || getConfig().api.defaultPrompt;
+
   if (sessionId) {
-    return continueSession(sessionId, prompt);
+    return continueSession(sessionId, effectivePrompt);
   }
 
   if (!sources || sources.length === 0) {
     throw new ApiError('NO_IMAGE_PROVIDED', 'source is required for the first image analysis call');
   }
 
-  return startSession(sources, prompt);
+  return startSession(sources, effectivePrompt);
 }
 
 async function startSession(
@@ -42,7 +42,7 @@ async function startSession(
     role: 'user',
     content: [
       ...imageRefsToBlocks(images),
-      { type: 'text', text: prompt || DEFAULT_PROMPT },
+      { type: 'text', text: prompt },
     ],
   };
   const storedMessages: StoredMessageParam[] = [userMessage];
@@ -69,7 +69,7 @@ async function continueSession(
 
   const question: StoredMessageParam = {
     role: 'user',
-    content: [{ type: 'text', text: prompt || DEFAULT_PROMPT }],
+    content: [{ type: 'text', text: prompt }],
   };
   const storedMessages: StoredMessageParam[] = [...session.history.messages, question];
   const apiMessages = expandStoredMessages(storedMessages, session.images);
@@ -86,22 +86,26 @@ async function continueSession(
 async function callVisionApi(
   messages: Anthropic.Messages.MessageParam[],
 ): Promise<string> {
-  const apiKey = process.env.ANTHROPIC_AUTH_TOKEN;
+  const config = getConfig();
+  const apiKey = config.api.authToken;
   if (!apiKey) {
-    throw new ApiError('API_TOKEN_MISSING', 'ANTHROPIC_AUTH_TOKEN is required');
+    throw new ApiError(
+      'API_TOKEN_MISSING',
+      `ANTHROPIC_AUTH_TOKEN is required. Set it in ${config.configPath} or as an environment variable.`,
+    );
   }
 
   const client = new Anthropic({
     apiKey,
-    baseURL: process.env.ANTHROPIC_BASE_URL,
+    baseURL: config.api.baseUrl,
   });
-  const model = process.env.QWEN_MODEL || DEFAULT_MODEL;
+  const model = config.api.model;
 
   try {
     logger.info('api', 'requesting image analysis', { model, messageCount: messages.length });
     const stream = client.messages.stream({
       model,
-      max_tokens: 64_000,
+      max_tokens: config.api.maxTokens,
       messages,
     });
     let text = '';

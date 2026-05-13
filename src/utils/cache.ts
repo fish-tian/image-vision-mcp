@@ -10,23 +10,15 @@ import {
   stat,
   writeFile,
 } from 'node:fs/promises';
-import { homedir } from 'node:os';
 import { basename, join } from 'node:path';
 
 import type { ImageData } from './imageReader.js';
 import { imageFromBuffer } from './imageReader.js';
+import { expandPath, getConfig } from './config.js';
 import { CacheError } from './errors.js';
 import { logger } from './logger.js';
 
-const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
-const MAX_CACHE_BYTES = 500 * 1024 * 1024;
-const LOCK_TIMEOUT_MS = 5_000;
 const LOCK_RETRY_MS = 75;
-
-const CACHE_ROOT = join(homedir(), '.image-vision-cache');
-const SESSIONS_DIR = join(CACHE_ROOT, 'sessions');
-const IMAGES_DIR = join(CACHE_ROOT, 'images');
-const LOCKS_DIR = join(CACHE_ROOT, 'locks');
 
 export interface ImageRef {
   hash: string;
@@ -78,8 +70,9 @@ export class SessionLock {
 
   async acquire(): Promise<boolean> {
     const startedAt = Date.now();
+    const timeoutMs = getConfig().cache.lockTimeoutMs;
 
-    while (Date.now() - startedAt < LOCK_TIMEOUT_MS) {
+    while (Date.now() - startedAt < timeoutMs) {
       try {
         this.handle = await open(this.lockPath, constants.O_CREAT | constants.O_EXCL | constants.O_RDWR);
         await this.handle.writeFile(JSON.stringify({ sessionId: this.sessionId, pid: process.pid, createdAt: Date.now() }));
@@ -128,14 +121,15 @@ export async function migrateOldCache(): Promise<void> {
 
 export async function initCache(): Promise<void> {
   try {
+    const paths = cachePaths();
     await Promise.all([
-      mkdir(SESSIONS_DIR, { recursive: true }),
-      mkdir(IMAGES_DIR, { recursive: true }),
-      mkdir(LOCKS_DIR, { recursive: true }),
+      mkdir(paths.sessionsDir, { recursive: true }),
+      mkdir(paths.imagesDir, { recursive: true }),
+      mkdir(paths.locksDir, { recursive: true }),
     ]);
 
     const cleanup = await cleanupExpiredSessions();
-    logger.info('cache', 'cache initialized', cleanup);
+    logger.info('cache', 'cache initialized', { ...cleanup, cacheDir: paths.root });
   } catch (error) {
     throw new CacheError('CACHE_INIT_FAILED', 'Failed to initialize cache', error);
   }
@@ -149,8 +143,9 @@ export async function createSession(images: ImageData[], _prompt?: string): Prom
   const history: SessionHistory = { sessionId, messages: [], updatedAt: now };
 
   try {
-    await mkdir(SESSIONS_DIR, { recursive: true });
-    await mkdir(IMAGES_DIR, { recursive: true });
+    const paths = cachePaths();
+    await mkdir(paths.sessionsDir, { recursive: true });
+    await mkdir(paths.imagesDir, { recursive: true });
 
     for (const image of images) {
       const path = imagePath(image.hash);
@@ -242,11 +237,12 @@ export async function cleanupExpiredSessions(): Promise<{ cleaned: number; freed
     }
 
     let total = await cacheSizeBytes();
-    if (total > MAX_CACHE_BYTES) {
+    const maxCacheBytes = getConfig().cache.maxMb * 1024 * 1024;
+    if (total > maxCacheBytes) {
       const remaining = (await listMetas()).sort((a, b) => a.lastAccessAt - b.lastAccessAt);
 
       for (const meta of remaining) {
-        if (total <= MAX_CACHE_BYTES) {
+        if (total <= maxCacheBytes) {
           break;
         }
 
@@ -316,14 +312,14 @@ async function cleanupUnreferencedImages(): Promise<number> {
   }
 
   let freedBytes = 0;
-  const imageFiles = await safeReaddir(IMAGES_DIR);
+  const imageFiles = await safeReaddir(cachePaths().imagesDir);
   for (const filename of imageFiles) {
     const hash = basename(filename, '.bin');
     if (referenced.has(hash)) {
       continue;
     }
 
-    const path = join(IMAGES_DIR, filename);
+    const path = join(cachePaths().imagesDir, filename);
     freedBytes += await fileSize(path);
     await rm(path, { force: true });
   }
@@ -332,14 +328,16 @@ async function cleanupUnreferencedImages(): Promise<number> {
 }
 
 async function listMetas(): Promise<SessionMeta[]> {
-  const files = (await safeReaddir(SESSIONS_DIR)).filter((file) => file.endsWith('.meta.json'));
-  const metas = await Promise.all(files.map((file) => readJson<SessionMeta>(join(SESSIONS_DIR, file))));
+  const sessions = cachePaths().sessionsDir;
+  const files = (await safeReaddir(sessions)).filter((file) => file.endsWith('.meta.json'));
+  const metas = await Promise.all(files.map((file) => readJson<SessionMeta>(join(sessions, file))));
   return metas.filter((meta): meta is SessionMeta => Boolean(meta));
 }
 
 async function cacheSizeBytes(): Promise<number> {
   let total = 0;
-  for (const dir of [SESSIONS_DIR, IMAGES_DIR]) {
+  const paths = cachePaths();
+  for (const dir of [paths.sessionsDir, paths.imagesDir]) {
     for (const file of await safeReaddir(dir)) {
       total += await fileSize(join(dir, file));
     }
@@ -417,23 +415,33 @@ async function fileSize(path: string): Promise<number> {
 }
 
 function isExpired(meta: SessionMeta): boolean {
-  return Date.now() - meta.lastAccessAt > CACHE_TTL_MS;
+  return Date.now() - meta.lastAccessAt > getConfig().cache.ttlHours * 60 * 60 * 1000;
 }
 
 function metaPath(sessionId: string): string {
-  return join(SESSIONS_DIR, `${sessionId}.meta.json`);
+  return join(cachePaths().sessionsDir, `${sessionId}.meta.json`);
 }
 
 function historyPath(sessionId: string): string {
-  return join(SESSIONS_DIR, `${sessionId}.history.json`);
+  return join(cachePaths().sessionsDir, `${sessionId}.history.json`);
 }
 
 function imagePath(hash: string): string {
-  return join(IMAGES_DIR, `${hash}.bin`);
+  return join(cachePaths().imagesDir, `${hash}.bin`);
 }
 
 function lockPath(sessionId: string): string {
-  return join(LOCKS_DIR, `${sessionId}.lock`);
+  return join(cachePaths().locksDir, `${sessionId}.lock`);
+}
+
+function cachePaths(): { root: string; sessionsDir: string; imagesDir: string; locksDir: string } {
+  const root = expandPath(getConfig().cache.dir);
+  return {
+    root,
+    sessionsDir: join(root, 'sessions'),
+    imagesDir: join(root, 'images'),
+    locksDir: join(root, 'locks'),
+  };
 }
 
 function sleep(ms: number): Promise<void> {

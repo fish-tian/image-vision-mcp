@@ -1,0 +1,22 @@
+{
+  "api": {
+    "authToken": "your-token",
+    "baseUrl": "https://your-compatible-endpoint",
+    "model": "openai/qwen3.6-plus",
+    "maxTokens": 64000,
+    "defaultPrompt": "Please analyze the image content."
+  },
+  "cache": {
+    "dir": "~/.image-vision-cache",
+    "ttlHours": 24,
+    "maxMb": 500,
+    "lockTimeoutMs": 5000
+  },
+  "image": {
+    "fetchTimeoutMs": 30000,
+    "maxBytes": 20971520
+  },
+  "log": {
+    "level": "info"
+  }
+}

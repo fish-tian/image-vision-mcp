@@ -24,33 +24,30 @@ An MCP server that exposes image analysis through a single `analyze_image` tool.
 
 ### From GitHub Release
 
-Download `image-vision-mcp-vX.Y.Z.zip` from GitHub Releases, extract it to a permanent folder, then run the installer for your system.
+Download `image-vision-mcp-vX.Y.Z.zip` from GitHub Releases and extract it to a permanent folder. The release zip is self-contained and does not require `npm install` or `bun install`.
 
-Windows PowerShell:
-
-```powershell
-Expand-Archive .\image-vision-mcp-v1.0.0.zip -DestinationPath "$HOME\mcp\image-vision-mcp"
-cd "$HOME\mcp\image-vision-mcp"
-.\install-claude-code.ps1 -AnthropicAuthToken "your-token"
-```
-
-macOS / Linux:
+Create a user config file:
 
 ```bash
-mkdir -p "$HOME/mcp/image-vision-mcp"
-unzip image-vision-mcp-v1.0.0.zip -d "$HOME/mcp/image-vision-mcp"
-cd "$HOME/mcp/image-vision-mcp"
-chmod +x ./install-claude-code.sh
-ANTHROPIC_AUTH_TOKEN="your-token" ./install-claude-code.sh
+mkdir -p ~/.image-vision-mcp
+cp config.example.json ~/.image-vision-mcp/config.json
 ```
 
-The installer writes `~/.image-vision-mcp/config.json`, then registers the server with Claude Code:
+Edit `~/.image-vision-mcp/config.json` and set at least `api.authToken`, `api.baseUrl`, and `api.model`.
+
+Register the server with Claude Code:
 
 ```bash
-claude mcp add -s user image-vision -- node /path/to/dist/index.js
+claude mcp add -s user image-vision -- node /absolute/path/to/image-vision-mcp/dist/index.js
 ```
 
-See [INSTALL_CLAUDE_CODE.md](./INSTALL_CLAUDE_CODE.md) for detailed steps. If you want Claude Code to install it for you, copy the prompt in [CLAUDECODE_INSTALL_PROMPT.md](./CLAUDECODE_INSTALL_PROMPT.md).
+Verify:
+
+```bash
+claude mcp get image-vision
+```
+
+See [SKILL.md](./SKILL.md) for detailed cross-platform installation steps.
 
 ### From Source
 
@@ -252,6 +249,8 @@ For a built version:
   }
 }
 ```
+
+Release zip users should prefer the `node dist/index.js` command and the config file flow described in [SKILL.md](./SKILL.md).
 
 ## Cache Layout
 

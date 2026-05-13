@@ -20,11 +20,7 @@ const CRC_TABLE = createCrcTable();
 
 const releaseFiles = [
   'README.md',
-  'INSTALL_CLAUDE_CODE.md',
-  'CLAUDECODE_INSTALL_PROMPT.md',
-  'install-claude-code.ps1',
-  'install-claude-code.sh',
-  '.env.example',
+  'SKILL.md',
   'config.example.json',
   'dist/index.js',
 ];
@@ -43,9 +39,26 @@ for (const file of releaseFiles) {
   entries.push({
     source,
     name: file.split(sep).join('/'),
-    mode: file.endsWith('.sh') ? 0o100755 : 0o100644,
+    mode: 0o100644,
   });
 }
+
+const releasePackageJson = join(releaseDir, 'package.json');
+await writeFile(
+  releasePackageJson,
+  `${JSON.stringify({
+    name: pkg.name,
+    version: pkg.version,
+    type: 'module',
+    main: 'dist/index.js',
+  }, null, 2)}\n`,
+  'utf8',
+);
+entries.push({
+  source: releasePackageJson,
+  name: 'package.json',
+  mode: 0o100644,
+});
 
 await writeZip(zipPath, entries);
 console.log(`Created ${relative(root, zipPath)}`);

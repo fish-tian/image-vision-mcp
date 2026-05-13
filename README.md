@@ -14,11 +14,45 @@ An MCP server that exposes image analysis through a single `analyze_image` tool.
 
 ## Requirements
 
-- [Bun](https://bun.sh/)
+- Node.js for release zip usage
+- [Bun](https://bun.sh/) for source development and packaging
+- Claude Code CLI for `claude mcp add` installation
 - An Anthropic-compatible multimodal API endpoint
 - `ANTHROPIC_AUTH_TOKEN`
 
 ## Install
+
+### From GitHub Release
+
+Download `image-vision-mcp-vX.Y.Z.zip` from GitHub Releases, extract it to a permanent folder, then run the installer for your system.
+
+Windows PowerShell:
+
+```powershell
+Expand-Archive .\image-vision-mcp-v1.0.0.zip -DestinationPath "$HOME\mcp\image-vision-mcp"
+cd "$HOME\mcp\image-vision-mcp"
+.\install-claude-code.ps1 -AnthropicAuthToken "your-token"
+```
+
+macOS / Linux:
+
+```bash
+mkdir -p "$HOME/mcp/image-vision-mcp"
+unzip image-vision-mcp-v1.0.0.zip -d "$HOME/mcp/image-vision-mcp"
+cd "$HOME/mcp/image-vision-mcp"
+chmod +x ./install-claude-code.sh
+ANTHROPIC_AUTH_TOKEN="your-token" ./install-claude-code.sh
+```
+
+The installer registers the server with Claude Code:
+
+```bash
+claude mcp add -s user -e ANTHROPIC_AUTH_TOKEN=your-token image-vision -- node /path/to/dist/index.js
+```
+
+See [INSTALL_CLAUDE_CODE.md](./INSTALL_CLAUDE_CODE.md) for detailed steps. If you want Claude Code to install it for you, copy the prompt in [CLAUDECODE_INSTALL_PROMPT.md](./CLAUDECODE_INSTALL_PROMPT.md).
+
+### From Source
 
 ```bash
 bun install
@@ -54,6 +88,18 @@ Build the server:
 
 ```bash
 bun run build
+```
+
+Build the single-file release bundle:
+
+```bash
+bun run build:bundle
+```
+
+Create a release zip:
+
+```bash
+bun run package
 ```
 
 The production entrypoint is:
@@ -148,13 +194,13 @@ Cache data is stored under `~/.image-vision-cache/`:
 
 ```text
 ~/.image-vision-cache/
-├── sessions/
-│   ├── img_xxx.meta.json
-│   └── img_xxx.history.json
-├── images/
-│   └── {sha256_hash}.bin
-└── locks/
-    └── img_xxx.lock
++-- sessions/
+|   +-- img_xxx.meta.json
+|   +-- img_xxx.history.json
++-- images/
+|   +-- {sha256_hash}.bin
++-- locks/
+    +-- img_xxx.lock
 ```
 
 The metadata and history files are small JSON files. Image blobs are stored once by SHA256 hash and can be shared by multiple sessions.

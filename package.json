@@ -5,7 +5,9 @@
   "main": "dist/index.js",
   "scripts": {
     "build": "bun build src/index.ts --outdir dist --target node --format esm --external @anthropic-ai/sdk --external @modelcontextprotocol/sdk --external zod --minify",
+    "build:bundle": "bun build src/index.ts --outfile dist/index.js --target node --format esm --minify",
     "dev": "bun run src/index.ts",
+    "package": "bun run build:bundle && bun run scripts/package-release.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

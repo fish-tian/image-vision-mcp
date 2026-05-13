@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 
-import { ensureUserConfigFromEnv, expandPath, getConfig, resetConfigForTests } from '../src/utils/config.js';
+import { expandPath, getConfig, resetConfigForTests } from '../src/utils/config.js';
 import { cleanupPath, restoreEnv, snapshotEnv, testTempPath, writeJson } from './helpers/env.js';
 
 let env: Record<string, string | undefined>;
@@ -88,7 +88,7 @@ describe('config', () => {
     expect(config.diagnostics.timeoutMs).toBe(333);
   });
 
-  test('environment variables override config file', async () => {
+  test('non-empty config values override environment variables', async () => {
     await writeJson(tempConfigPath, {
       api: {
         authToken: 'file-token',
@@ -118,6 +118,30 @@ describe('config', () => {
 
     const config = getConfig();
 
+    expect(config.api.authToken).toBe('file-token');
+    expect(config.api.baseUrl).toBe('https://file.test');
+    expect(config.api.model).toBe('file-model');
+    expect(config.api.maxTokens).toBe(100);
+    expect(config.diagnostics.enabled).toBe(false);
+    expect(config.diagnostics.model).toBe('file-diagnostic-model');
+    expect(config.diagnostics.maxTokens).toBe(300);
+    expect(config.diagnostics.timeoutMs).toBe(400);
+    expect(config.cache.ttlHours).toBe(10);
+  });
+
+  test('uses environment variables when config file is missing', () => {
+    process.env.ANTHROPIC_AUTH_TOKEN = 'env-token';
+    process.env.ANTHROPIC_BASE_URL = 'https://env.test';
+    process.env.QWEN_MODEL = 'env-model';
+    process.env.ANTHROPIC_MODEL = 'env-diagnostic-model';
+    process.env.VISION_MAX_TOKENS = '200';
+    process.env.DIAGNOSTICS_MAX_TOKENS = '500';
+    process.env.DIAGNOSTICS_TIMEOUT_MS = '600';
+    process.env.DIAGNOSTICS_ENABLED = 'false';
+    resetConfigForTests();
+
+    const config = getConfig();
+
     expect(config.api.authToken).toBe('env-token');
     expect(config.api.baseUrl).toBe('https://env.test');
     expect(config.api.model).toBe('env-model');
@@ -126,7 +150,34 @@ describe('config', () => {
     expect(config.diagnostics.model).toBe('env-diagnostic-model');
     expect(config.diagnostics.maxTokens).toBe(500);
     expect(config.diagnostics.timeoutMs).toBe(600);
-    expect(config.cache.ttlHours).toBe(20);
+  });
+
+  test('empty config strings do not override environment variables', async () => {
+    await writeJson(tempConfigPath, {
+      api: {
+        authToken: '',
+        baseUrl: '',
+        model: '',
+        defaultPrompt: '',
+      },
+      diagnostics: {
+        model: '',
+      },
+    });
+    process.env.ANTHROPIC_AUTH_TOKEN = 'env-token';
+    process.env.ANTHROPIC_BASE_URL = 'https://env.test';
+    process.env.QWEN_MODEL = 'env-model';
+    process.env.ANTHROPIC_MODEL = 'env-diagnostic-model';
+    process.env.VISION_DEFAULT_PROMPT = 'env prompt';
+    resetConfigForTests();
+
+    const config = getConfig();
+
+    expect(config.api.authToken).toBe('env-token');
+    expect(config.api.baseUrl).toBe('https://env.test');
+    expect(config.api.model).toBe('env-model');
+    expect(config.api.defaultPrompt).toBe('env prompt');
+    expect(config.diagnostics.model).toBe('env-diagnostic-model');
   });
 
   test('invalid numeric and log values fall back to defaults', async () => {
@@ -157,46 +208,4 @@ describe('config', () => {
     expect(expandPath('~/cache')).toBe(join(homedir(), 'cache'));
   });
 
-  test('creates missing config file from environment variables', async () => {
-    process.env.ANTHROPIC_AUTH_TOKEN = 'env-token';
-    process.env.ANTHROPIC_BASE_URL = 'https://env.example';
-    process.env.QWEN_MODEL = 'env-qwen-model';
-    process.env.ANTHROPIC_MODEL = 'env-claude-model';
-    resetConfigForTests();
-
-    const result = ensureUserConfigFromEnv();
-    const config = getConfig();
-
-    expect(result.created).toBe(true);
-    expect(result.path).toBe(tempConfigPath);
-    expect(config.api.authToken).toBe('env-token');
-    expect(config.api.baseUrl).toBe('https://env.example');
-    expect(config.api.model).toBe('env-qwen-model');
-    expect(config.cache.ttlHours).toBe(24);
-    expect(config.image.maxBytes).toBe(20 * 1024 * 1024);
-    expect(config.log.level).toBe('info');
-    expect(config.diagnostics.model).toBe('env-claude-model');
-  });
-
-  test('does not overwrite existing config file during initialization', async () => {
-    await writeJson(tempConfigPath, {
-      api: {
-        authToken: 'file-token',
-        baseUrl: 'https://file.example',
-        model: 'file-model',
-      },
-    });
-    process.env.ANTHROPIC_AUTH_TOKEN = 'env-token';
-    resetConfigForTests();
-
-    const result = ensureUserConfigFromEnv();
-    delete process.env.ANTHROPIC_AUTH_TOKEN;
-    resetConfigForTests();
-    const config = getConfig();
-
-    expect(result.created).toBe(false);
-    expect(config.api.authToken).toBe('file-token');
-    expect(config.api.baseUrl).toBe('https://file.example');
-    expect(config.api.model).toBe('file-model');
-  });
 });

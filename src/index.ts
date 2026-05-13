@@ -4,7 +4,6 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { z } from 'zod';
 
 import { initCache, migrateOldCache } from './utils/cache.js';
-import { ensureUserConfigFromEnv } from './utils/config.js';
 import { buildErrorResponse } from './utils/errorDiagnostics.js';
 import { formatError } from './utils/errors.js';
 import { logger } from './utils/logger.js';
@@ -62,10 +61,6 @@ server.tool(
 
 async function main(): Promise<void> {
   try {
-    const configInit = ensureUserConfigFromEnv();
-    logger.info('server', configInit.created ? 'created user config from environment' : 'user config already exists', {
-      configPath: configInit.path,
-    });
     await migrateOldCache();
     await initCache();
     await server.connect(new StdioServerTransport());

@@ -91,7 +91,7 @@ async function callVisionApi(
   if (!apiKey) {
     throw new ApiError(
       'API_TOKEN_MISSING',
-      `ANTHROPIC_AUTH_TOKEN is required. Set it in ${config.configPath} or as an environment variable.`,
+      `ANTHROPIC_AUTH_TOKEN is required. Set it in the environment or set a non-empty api.authToken in ${config.configPath}.`,
     );
   }
 

@@ -1,8 +1,8 @@
 {
   "api": {
-    "authToken": "your-token",
-    "baseUrl": "https://your-compatible-endpoint",
-    "model": "openai/qwen3.6-plus",
+    "authToken": "",
+    "baseUrl": "",
+    "model": "",
     "maxTokens": 64000,
     "defaultPrompt": "Please analyze the image content."
   },
@@ -21,7 +21,7 @@
   },
   "diagnostics": {
     "enabled": true,
-    "model": "claude-3-5-sonnet-latest",
+    "model": "",
     "maxTokens": 1000,
     "timeoutMs": 8000
   }

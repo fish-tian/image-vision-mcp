@@ -1,6 +1,6 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { dirname, isAbsolute, join, normalize } from 'node:path';
+import { isAbsolute, join, normalize } from 'node:path';
 
 export interface ImageVisionConfig {
   api: {
@@ -78,26 +78,10 @@ export function getConfig(): ImageVisionConfig {
 
   const configPath = expandPath(process.env.IMAGE_VISION_CONFIG || DEFAULT_CONFIG_PATH);
   const fileConfig = readConfigFile(configPath);
-  const merged = mergeConfig(DEFAULT_CONFIG, fileConfig);
-  cachedConfig = applyEnvOverrides({ ...merged, configPath });
+  const defaultsWithEnv = applyEnvDefaults(DEFAULT_CONFIG);
+  const merged = mergeConfig(defaultsWithEnv, fileConfig);
+  cachedConfig = { ...merged, configPath };
   return cachedConfig;
-}
-
-export function ensureUserConfigFromEnv(): { created: boolean; path: string } {
-  const configPath = expandPath(process.env.IMAGE_VISION_CONFIG || DEFAULT_CONFIG_PATH);
-  if (existsSync(configPath)) {
-    return { created: false, path: configPath };
-  }
-
-  const config = applyEnvOverrides({
-    ...DEFAULT_CONFIG,
-    configPath,
-  });
-
-  mkdirSync(dirname(configPath), { recursive: true });
-  writeFileSync(configPath, `${JSON.stringify(stripRuntimeOnlyConfig(config), null, 2)}\n`, 'utf8');
-  cachedConfig = null;
-  return { created: true, path: configPath };
 }
 
 export function resetConfigForTests(): void {
@@ -128,16 +112,6 @@ function readConfigFile(path: string): PartialConfig {
   }
 }
 
-function stripRuntimeOnlyConfig(config: ImageVisionConfig): Omit<ImageVisionConfig, 'configPath'> {
-  return {
-    api: config.api,
-    cache: config.cache,
-    image: config.image,
-    log: config.log,
-    diagnostics: config.diagnostics,
-  };
-}
-
 function mergeConfig(
   defaults: Omit<ImageVisionConfig, 'configPath'>,
   fileConfig: PartialConfig,
@@ -146,6 +120,8 @@ function mergeConfig(
     api: {
       ...defaults.api,
       ...fileConfig.api,
+      authToken: nonEmptyString(fileConfig.api?.authToken, defaults.api.authToken),
+      baseUrl: optionalNonEmptyString(fileConfig.api?.baseUrl, defaults.api.baseUrl),
       maxTokens: positiveNumber(fileConfig.api?.maxTokens, defaults.api.maxTokens),
       defaultPrompt: nonEmptyString(fileConfig.api?.defaultPrompt, defaults.api.defaultPrompt),
       model: nonEmptyString(fileConfig.api?.model, defaults.api.model),
@@ -180,7 +156,7 @@ function mergeConfig(
   };
 }
 
-function applyEnvOverrides(config: ImageVisionConfig): ImageVisionConfig {
+function applyEnvDefaults(config: Omit<ImageVisionConfig, 'configPath'>): Omit<ImageVisionConfig, 'configPath'> {
   return {
     ...config,
     api: {
@@ -230,6 +206,10 @@ function envPositiveNumber(name: string, fallback: number): number {
 }
 
 function nonEmptyString(value: unknown, fallback: string): string {
+  return typeof value === 'string' && value.trim() ? value : fallback;
+}
+
+function optionalNonEmptyString(value: unknown, fallback: string | undefined): string | undefined {
   return typeof value === 'string' && value.trim() ? value : fallback;
 }
 

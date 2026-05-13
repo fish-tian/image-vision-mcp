@@ -47,7 +47,7 @@ export function localDiagnose(error: unknown): string {
       case 'API_TOKEN_MISSING':
         return bullets(
           'API token is missing or empty.',
-          'Edit ~/.image-vision-mcp/config.json and set api.authToken, or set ANTHROPIC_AUTH_TOKEN.',
+          'Set ANTHROPIC_AUTH_TOKEN in the Claude Code environment, or edit ~/.image-vision-mcp/config.json and set a non-empty api.authToken.',
           'Ask the user to provide or configure a valid API token.',
         );
       case 'NO_IMAGE_PROVIDED':
@@ -72,7 +72,7 @@ export function localDiagnose(error: unknown): string {
       case 'API_REQUEST_FAILED':
         return bullets(
           'The upstream model API request failed.',
-          'Check api.baseUrl, api.authToken, QWEN_MODEL for image analysis, network connectivity, provider quota, and model availability.',
+          'Check ANTHROPIC_BASE_URL/api.baseUrl, ANTHROPIC_AUTH_TOKEN/api.authToken, QWEN_MODEL/api.model, network connectivity, provider quota, and model availability.',
           'Ask the user whether they want help checking API configuration or provider status.',
         );
       default:

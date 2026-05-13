@@ -25,7 +25,7 @@ The default user config path is:
 Configuration priority is:
 
 ```text
-environment variables > config.json > built-in defaults
+non-empty config.json values > environment variables > built-in defaults
 ```
 
 The config file shape is:
@@ -33,9 +33,9 @@ The config file shape is:
 ```json
 {
   "api": {
-    "authToken": "your-token",
-    "baseUrl": "https://your-compatible-endpoint",
-    "model": "openai/qwen3.6-plus",
+    "authToken": "",
+    "baseUrl": "",
+    "model": "",
     "maxTokens": 64000,
     "defaultPrompt": "Please analyze the image content."
   },
@@ -54,7 +54,7 @@ The config file shape is:
   },
   "diagnostics": {
     "enabled": true,
-    "model": "claude-3-5-sonnet-latest",
+    "model": "",
     "maxTokens": 1000,
     "timeoutMs": 8000
   }
@@ -120,18 +120,13 @@ It intentionally has no dependencies. Users should not need package installation
 
 ## Install Flow For Users
 
-Users extract the zip and register the MCP server with Claude Code while passing initial configuration through environment variables:
+Users extract the zip and register the MCP server with Claude Code:
 
 ```bash
-claude mcp add -s user \
-  -e ANTHROPIC_AUTH_TOKEN=your-token \
-  -e ANTHROPIC_BASE_URL=https://your-compatible-endpoint \
-  -e QWEN_MODEL=openai/qwen3.6-plus \
-  -e ANTHROPIC_MODEL=claude-3-5-sonnet-latest \
-  image-vision -- node /absolute/path/to/image-vision-mcp/dist/index.js
+claude mcp add -s user image-vision -- node /absolute/path/to/image-vision-mcp/dist/index.js
 ```
 
-On first startup, the server creates `~/.image-vision-mcp/config.json` from these environment variables. If the file already exists, it is left unchanged.
+If Claude Code can see `ANTHROPIC_AUTH_TOKEN`, `ANTHROPIC_BASE_URL`, `QWEN_MODEL`, or `ANTHROPIC_MODEL`, the server uses those values automatically. If not, users can copy `config.example.json` to `~/.image-vision-mcp/config.json` and fill in non-empty values. Empty strings are treated as unset.
 
 They can verify with:
 

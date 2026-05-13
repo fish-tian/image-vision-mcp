@@ -36,34 +36,29 @@ Example locations:
 C:\Users\you\mcp\image-vision-mcp
 ```
 
-2. Register the MCP server with Claude Code and pass the initial API configuration as environment variables.
+2. Register the MCP server with Claude Code.
 
 Use the absolute path to `dist/index.js` inside the extracted release directory.
 
 macOS / Linux:
 
 ```bash
-claude mcp add -s user \
-  -e ANTHROPIC_AUTH_TOKEN=your-token \
-  -e ANTHROPIC_BASE_URL=https://your-compatible-endpoint \
-  -e QWEN_MODEL=openai/qwen3.6-plus \
-  -e ANTHROPIC_MODEL=claude-3-5-sonnet-latest \
-  image-vision -- node /absolute/path/to/image-vision-mcp/dist/index.js
+claude mcp add -s user image-vision -- node /absolute/path/to/image-vision-mcp/dist/index.js
 ```
 
 Windows PowerShell:
 
 ```powershell
-claude mcp add -s user -e ANTHROPIC_AUTH_TOKEN=your-token -e ANTHROPIC_BASE_URL=https://your-compatible-endpoint -e QWEN_MODEL=openai/qwen3.6-plus -e ANTHROPIC_MODEL=claude-3-5-sonnet-latest image-vision -- node C:\absolute\path\to\image-vision-mcp\dist\index.js
+claude mcp add -s user image-vision -- node C:\absolute\path\to\image-vision-mcp\dist\index.js
 ```
 
-On first startup, the server creates:
+The server reads configuration in this order:
 
 ```text
-~/.image-vision-mcp/config.json
+non-empty ~/.image-vision-mcp/config.json values > environment variables > built-in defaults
 ```
 
-It fills that file from the environment variables above. If the file already exists, it is not overwritten.
+If the Claude Code process can see `ANTHROPIC_AUTH_TOKEN`, `ANTHROPIC_BASE_URL`, `QWEN_MODEL`, or `ANTHROPIC_MODEL`, the server will use them automatically. If not, create or edit `~/.image-vision-mcp/config.json`.
 
 3. Verify.
 
@@ -75,7 +70,7 @@ Start a new Claude Code session and use the `analyze_image` tool.
 
 ## Update Configuration
 
-After installation, edit:
+Create or edit:
 
 ```text
 ~/.image-vision-mcp/config.json
@@ -83,9 +78,20 @@ After installation, edit:
 
 You do not need to reinstall the MCP server after changing model, base URL, token, cache limits, image limits, or diagnostics settings. Restart Claude Code or start a new session for changes to take effect.
 
-If you want to regenerate the config from environment variables, delete `~/.image-vision-mcp/config.json` and restart the MCP server.
+To start from the template, copy `config.example.json` to `~/.image-vision-mcp/config.json`.
 
-You can still create the config manually by copying `config.example.json` to `~/.image-vision-mcp/config.json`.
+Only non-empty config values override environment variables. Empty strings in the config file are treated as unset.
+
+Optional: register with explicit environment variables if Claude Code cannot see your shell environment:
+
+```bash
+claude mcp add -s user \
+  -e ANTHROPIC_AUTH_TOKEN=your-token \
+  -e ANTHROPIC_BASE_URL=https://your-compatible-endpoint \
+  -e QWEN_MODEL=openai/qwen3.6-plus \
+  -e ANTHROPIC_MODEL=claude-3-5-sonnet-latest \
+  image-vision -- node /absolute/path/to/image-vision-mcp/dist/index.js
+```
 
 ## Remove
 

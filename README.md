@@ -29,15 +29,10 @@ Download `image-vision-mcp-vX.Y.Z.zip` from GitHub Releases and extract it to a 
 Register the server with Claude Code:
 
 ```bash
-claude mcp add -s user \
-  -e ANTHROPIC_AUTH_TOKEN=your-token \
-  -e ANTHROPIC_BASE_URL=https://your-compatible-endpoint \
-  -e QWEN_MODEL=openai/qwen3.6-plus \
-  -e ANTHROPIC_MODEL=claude-3-5-sonnet-latest \
-  image-vision -- node /absolute/path/to/image-vision-mcp/dist/index.js
+claude mcp add -s user image-vision -- node /absolute/path/to/image-vision-mcp/dist/index.js
 ```
 
-On first startup, the server creates `~/.image-vision-mcp/config.json` from those environment variables. If the config file already exists, it is not overwritten.
+The server reads non-empty `~/.image-vision-mcp/config.json` values first, then environment variables, then built-in defaults. If Claude Code can see `ANTHROPIC_AUTH_TOKEN`, `ANTHROPIC_BASE_URL`, `QWEN_MODEL`, or `ANTHROPIC_MODEL`, the tool uses them automatically. Otherwise, copy `config.example.json` to `~/.image-vision-mcp/config.json` and fill in the values.
 
 Verify:
 
@@ -61,16 +56,16 @@ The default user config file is:
 ~/.image-vision-mcp/config.json
 ```
 
-The server creates this file from environment variables on first startup if it does not already exist. Edit it after installation to change the API token, base URL, model, cache limits, image limits, diagnostics, or log level. You do not need to reinstall the MCP server after editing it.
+This file is optional. Edit it to override environment variables or configure API token, base URL, model, cache limits, image limits, diagnostics, or log level. You do not need to reinstall the MCP server after editing it.
 
 Example:
 
 ```json
 {
   "api": {
-    "authToken": "your-token",
-    "baseUrl": "https://your-compatible-endpoint",
-    "model": "openai/qwen3.6-plus",
+    "authToken": "",
+    "baseUrl": "",
+    "model": "",
     "maxTokens": 64000,
     "defaultPrompt": "Please analyze the image content."
   },
@@ -89,7 +84,7 @@ Example:
   },
   "diagnostics": {
     "enabled": true,
-    "model": "claude-3-5-sonnet-latest",
+    "model": "",
     "maxTokens": 1000,
     "timeoutMs": 8000
   }
@@ -99,7 +94,7 @@ Example:
 Configuration priority:
 
 ```text
-environment variables > config.json > built-in defaults
+non-empty config.json values > environment variables > built-in defaults
 ```
 
 Set `IMAGE_VISION_CONFIG` to use a custom config path.
@@ -127,6 +122,8 @@ Supported environment variables:
 | `DIAGNOSTICS_TIMEOUT_MS` | No | `8000` | Timeout for Anthropic error diagnosis. |
 
 `QWEN_MODEL` is used for image analysis. `ANTHROPIC_MODEL` is separate and used only to explain failures before the MCP tool returns an error to Claude Code.
+
+Empty strings in `config.json` are treated as unset and do not override environment variables.
 
 PowerShell example:
 

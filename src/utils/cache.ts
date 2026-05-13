@@ -1,6 +1,5 @@
 import type Anthropic from '@anthropic-ai/sdk';
 import { randomUUID } from 'node:crypto';
-import { constants } from 'node:fs';
 import {
   mkdir,
   open,
@@ -74,7 +73,7 @@ export class SessionLock {
 
     while (Date.now() - startedAt < timeoutMs) {
       try {
-        this.handle = await open(this.lockPath, constants.O_CREAT | constants.O_EXCL | constants.O_RDWR);
+        this.handle = await open(this.lockPath, 'wx+');
         await this.handle.writeFile(JSON.stringify({ sessionId: this.sessionId, pid: process.pid, createdAt: Date.now() }));
         return true;
       } catch (error) {

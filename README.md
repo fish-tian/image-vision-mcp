@@ -26,20 +26,18 @@ An MCP server that exposes image analysis through a single `analyze_image` tool.
 
 Download `image-vision-mcp-vX.Y.Z.zip` from GitHub Releases and extract it to a permanent folder. The release zip is self-contained and does not require `npm install` or `bun install`.
 
-Create a user config file:
-
-```bash
-mkdir -p ~/.image-vision-mcp
-cp config.example.json ~/.image-vision-mcp/config.json
-```
-
-Edit `~/.image-vision-mcp/config.json` and set at least `api.authToken`, `api.baseUrl`, and `api.model`.
-
 Register the server with Claude Code:
 
 ```bash
-claude mcp add -s user image-vision -- node /absolute/path/to/image-vision-mcp/dist/index.js
+claude mcp add -s user \
+  -e ANTHROPIC_AUTH_TOKEN=your-token \
+  -e ANTHROPIC_BASE_URL=https://your-compatible-endpoint \
+  -e QWEN_MODEL=openai/qwen3.6-plus \
+  -e ANTHROPIC_MODEL=claude-3-5-sonnet-latest \
+  image-vision -- node /absolute/path/to/image-vision-mcp/dist/index.js
 ```
+
+On first startup, the server creates `~/.image-vision-mcp/config.json` from those environment variables. If the config file already exists, it is not overwritten.
 
 Verify:
 
@@ -63,7 +61,7 @@ The default user config file is:
 ~/.image-vision-mcp/config.json
 ```
 
-Edit this file after installation to change the API token, base URL, model, cache limits, image limits, or log level. You do not need to reinstall the MCP server after editing it.
+The server creates this file from environment variables on first startup if it does not already exist. Edit it after installation to change the API token, base URL, model, cache limits, image limits, diagnostics, or log level. You do not need to reinstall the MCP server after editing it.
 
 Example:
 

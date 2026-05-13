@@ -1,6 +1,6 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { isAbsolute, join, normalize } from 'node:path';
+import { dirname, isAbsolute, join, normalize } from 'node:path';
 
 export interface ImageVisionConfig {
   api: {
@@ -83,6 +83,23 @@ export function getConfig(): ImageVisionConfig {
   return cachedConfig;
 }
 
+export function ensureUserConfigFromEnv(): { created: boolean; path: string } {
+  const configPath = expandPath(process.env.IMAGE_VISION_CONFIG || DEFAULT_CONFIG_PATH);
+  if (existsSync(configPath)) {
+    return { created: false, path: configPath };
+  }
+
+  const config = applyEnvOverrides({
+    ...DEFAULT_CONFIG,
+    configPath,
+  });
+
+  mkdirSync(dirname(configPath), { recursive: true });
+  writeFileSync(configPath, `${JSON.stringify(stripRuntimeOnlyConfig(config), null, 2)}\n`, 'utf8');
+  cachedConfig = null;
+  return { created: true, path: configPath };
+}
+
 export function resetConfigForTests(): void {
   cachedConfig = null;
 }
@@ -109,6 +126,16 @@ function readConfigFile(path: string): PartialConfig {
   } catch (error) {
     throw new Error(`Failed to read image vision config at ${path}: ${String(error)}`);
   }
+}
+
+function stripRuntimeOnlyConfig(config: ImageVisionConfig): Omit<ImageVisionConfig, 'configPath'> {
+  return {
+    api: config.api,
+    cache: config.cache,
+    image: config.image,
+    log: config.log,
+    diagnostics: config.diagnostics,
+  };
 }
 
 function mergeConfig(

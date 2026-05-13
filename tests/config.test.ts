@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 
-import { expandPath, getConfig, resetConfigForTests } from '../src/utils/config.js';
+import { ensureUserConfigFromEnv, expandPath, getConfig, resetConfigForTests } from '../src/utils/config.js';
 import { cleanupPath, restoreEnv, snapshotEnv, testTempPath, writeJson } from './helpers/env.js';
 
 let env: Record<string, string | undefined>;
@@ -155,5 +155,48 @@ describe('config', () => {
   test('expands tilde paths', () => {
     expect(expandPath('~')).toBe(homedir());
     expect(expandPath('~/cache')).toBe(join(homedir(), 'cache'));
+  });
+
+  test('creates missing config file from environment variables', async () => {
+    process.env.ANTHROPIC_AUTH_TOKEN = 'env-token';
+    process.env.ANTHROPIC_BASE_URL = 'https://env.example';
+    process.env.QWEN_MODEL = 'env-qwen-model';
+    process.env.ANTHROPIC_MODEL = 'env-claude-model';
+    resetConfigForTests();
+
+    const result = ensureUserConfigFromEnv();
+    const config = getConfig();
+
+    expect(result.created).toBe(true);
+    expect(result.path).toBe(tempConfigPath);
+    expect(config.api.authToken).toBe('env-token');
+    expect(config.api.baseUrl).toBe('https://env.example');
+    expect(config.api.model).toBe('env-qwen-model');
+    expect(config.cache.ttlHours).toBe(24);
+    expect(config.image.maxBytes).toBe(20 * 1024 * 1024);
+    expect(config.log.level).toBe('info');
+    expect(config.diagnostics.model).toBe('env-claude-model');
+  });
+
+  test('does not overwrite existing config file during initialization', async () => {
+    await writeJson(tempConfigPath, {
+      api: {
+        authToken: 'file-token',
+        baseUrl: 'https://file.example',
+        model: 'file-model',
+      },
+    });
+    process.env.ANTHROPIC_AUTH_TOKEN = 'env-token';
+    resetConfigForTests();
+
+    const result = ensureUserConfigFromEnv();
+    delete process.env.ANTHROPIC_AUTH_TOKEN;
+    resetConfigForTests();
+    const config = getConfig();
+
+    expect(result.created).toBe(false);
+    expect(config.api.authToken).toBe('file-token');
+    expect(config.api.baseUrl).toBe('https://file.example');
+    expect(config.api.model).toBe('file-model');
   });
 });

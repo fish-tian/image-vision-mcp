@@ -36,74 +36,36 @@ Example locations:
 C:\Users\you\mcp\image-vision-mcp
 ```
 
-2. Create the config directory.
-
-macOS / Linux:
-
-```bash
-mkdir -p ~/.image-vision-mcp
-```
-
-Windows PowerShell:
-
-```powershell
-New-Item -ItemType Directory -Force "$HOME\.image-vision-mcp"
-```
-
-3. Copy `config.example.json` to the user config path.
-
-macOS / Linux:
-
-```bash
-cp config.example.json ~/.image-vision-mcp/config.json
-```
-
-Windows PowerShell:
-
-```powershell
-Copy-Item .\config.example.json "$HOME\.image-vision-mcp\config.json" -Force
-```
-
-4. Edit `~/.image-vision-mcp/config.json`.
-
-Set at least:
-
-```json
-{
-  "api": {
-    "authToken": "your-token",
-    "baseUrl": "https://your-compatible-endpoint",
-    "model": "openai/qwen3.6-plus"
-  },
-  "diagnostics": {
-    "model": "claude-3-5-sonnet-latest"
-  }
-}
-```
-
-Notes:
-
-- `api.model` is the image analysis model.
-- `diagnostics.model` is the Anthropic text model used only for optional error diagnosis.
-- `QWEN_MODEL` and `ANTHROPIC_MODEL` can override these values at runtime.
-
-5. Register the MCP server with Claude Code.
+2. Register the MCP server with Claude Code and pass the initial API configuration as environment variables.
 
 Use the absolute path to `dist/index.js` inside the extracted release directory.
 
 macOS / Linux:
 
 ```bash
-claude mcp add -s user image-vision -- node /absolute/path/to/image-vision-mcp/dist/index.js
+claude mcp add -s user \
+  -e ANTHROPIC_AUTH_TOKEN=your-token \
+  -e ANTHROPIC_BASE_URL=https://your-compatible-endpoint \
+  -e QWEN_MODEL=openai/qwen3.6-plus \
+  -e ANTHROPIC_MODEL=claude-3-5-sonnet-latest \
+  image-vision -- node /absolute/path/to/image-vision-mcp/dist/index.js
 ```
 
 Windows PowerShell:
 
 ```powershell
-claude mcp add -s user image-vision -- node C:\absolute\path\to\image-vision-mcp\dist\index.js
+claude mcp add -s user -e ANTHROPIC_AUTH_TOKEN=your-token -e ANTHROPIC_BASE_URL=https://your-compatible-endpoint -e QWEN_MODEL=openai/qwen3.6-plus -e ANTHROPIC_MODEL=claude-3-5-sonnet-latest image-vision -- node C:\absolute\path\to\image-vision-mcp\dist\index.js
 ```
 
-6. Verify.
+On first startup, the server creates:
+
+```text
+~/.image-vision-mcp/config.json
+```
+
+It fills that file from the environment variables above. If the file already exists, it is not overwritten.
+
+3. Verify.
 
 ```bash
 claude mcp get image-vision
@@ -120,6 +82,10 @@ After installation, edit:
 ```
 
 You do not need to reinstall the MCP server after changing model, base URL, token, cache limits, image limits, or diagnostics settings. Restart Claude Code or start a new session for changes to take effect.
+
+If you want to regenerate the config from environment variables, delete `~/.image-vision-mcp/config.json` and restart the MCP server.
+
+You can still create the config manually by copying `config.example.json` to `~/.image-vision-mcp/config.json`.
 
 ## Remove
 

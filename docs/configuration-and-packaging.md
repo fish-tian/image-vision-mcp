@@ -120,17 +120,18 @@ It intentionally has no dependencies. Users should not need package installation
 
 ## Install Flow For Users
 
-Users extract the zip, copy `config.example.json` to:
-
-```text
-~/.image-vision-mcp/config.json
-```
-
-Then they register the MCP server with Claude Code:
+Users extract the zip and register the MCP server with Claude Code while passing initial configuration through environment variables:
 
 ```bash
-claude mcp add -s user image-vision -- node /absolute/path/to/image-vision-mcp/dist/index.js
+claude mcp add -s user \
+  -e ANTHROPIC_AUTH_TOKEN=your-token \
+  -e ANTHROPIC_BASE_URL=https://your-compatible-endpoint \
+  -e QWEN_MODEL=openai/qwen3.6-plus \
+  -e ANTHROPIC_MODEL=claude-3-5-sonnet-latest \
+  image-vision -- node /absolute/path/to/image-vision-mcp/dist/index.js
 ```
+
+On first startup, the server creates `~/.image-vision-mcp/config.json` from these environment variables. If the file already exists, it is left unchanged.
 
 They can verify with:
 

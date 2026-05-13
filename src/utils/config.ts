@@ -23,6 +23,12 @@ export interface ImageVisionConfig {
   log: {
     level: 'debug' | 'info' | 'warn' | 'error';
   };
+  diagnostics: {
+    enabled: boolean;
+    model: string;
+    maxTokens: number;
+    timeoutMs: number;
+  };
   configPath: string;
 }
 
@@ -31,6 +37,7 @@ type PartialConfig = {
   cache?: Partial<ImageVisionConfig['cache']>;
   image?: Partial<ImageVisionConfig['image']>;
   log?: Partial<ImageVisionConfig['log']>;
+  diagnostics?: Partial<ImageVisionConfig['diagnostics']>;
 };
 
 const DEFAULT_CONFIG_PATH = '~/.image-vision-mcp/config.json';
@@ -53,6 +60,12 @@ const DEFAULT_CONFIG: Omit<ImageVisionConfig, 'configPath'> = {
   },
   log: {
     level: 'info',
+  },
+  diagnostics: {
+    enabled: true,
+    model: '',
+    maxTokens: 1_000,
+    timeoutMs: 8_000,
   },
 };
 
@@ -129,6 +142,14 @@ function mergeConfig(
       ...fileConfig.log,
       level: logLevel(fileConfig.log?.level, defaults.log.level),
     },
+    diagnostics: {
+      ...defaults.diagnostics,
+      ...fileConfig.diagnostics,
+      enabled: booleanValue(fileConfig.diagnostics?.enabled, defaults.diagnostics.enabled),
+      model: nonEmptyString(fileConfig.diagnostics?.model, defaults.diagnostics.model),
+      maxTokens: positiveNumber(fileConfig.diagnostics?.maxTokens, defaults.diagnostics.maxTokens),
+      timeoutMs: positiveNumber(fileConfig.diagnostics?.timeoutMs, defaults.diagnostics.timeoutMs),
+    },
   };
 }
 
@@ -158,6 +179,12 @@ function applyEnvOverrides(config: ImageVisionConfig): ImageVisionConfig {
     log: {
       level: logLevel(process.env.LOG_LEVEL, config.log.level),
     },
+    diagnostics: {
+      enabled: envBoolean('DIAGNOSTICS_ENABLED', config.diagnostics.enabled),
+      model: process.env.ANTHROPIC_MODEL || config.diagnostics.model,
+      maxTokens: envPositiveNumber('DIAGNOSTICS_MAX_TOKENS', config.diagnostics.maxTokens),
+      timeoutMs: envPositiveNumber('DIAGNOSTICS_TIMEOUT_MS', config.diagnostics.timeoutMs),
+    },
   };
 }
 
@@ -177,6 +204,27 @@ function envPositiveNumber(name: string, fallback: number): number {
 
 function nonEmptyString(value: unknown, fallback: string): string {
   return typeof value === 'string' && value.trim() ? value : fallback;
+}
+
+function booleanValue(value: unknown, fallback: boolean): boolean {
+  return typeof value === 'boolean' ? value : fallback;
+}
+
+function envBoolean(name: string, fallback: boolean): boolean {
+  const value = process.env[name];
+  if (!value) {
+    return fallback;
+  }
+
+  if (/^(1|true|yes|on)$/i.test(value)) {
+    return true;
+  }
+
+  if (/^(0|false|no|off)$/i.test(value)) {
+    return false;
+  }
+
+  return fallback;
 }
 
 function logLevel(value: unknown, fallback: ImageVisionConfig['log']['level']): ImageVisionConfig['log']['level'] {

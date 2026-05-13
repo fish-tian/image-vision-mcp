@@ -114,6 +114,12 @@ Example:
   },
   "log": {
     "level": "info"
+  },
+  "diagnostics": {
+    "enabled": true,
+    "model": "claude-3-5-sonnet-latest",
+    "maxTokens": 1000,
+    "timeoutMs": 8000
   }
 }
 ```
@@ -125,6 +131,8 @@ environment variables > config.json > built-in defaults
 ```
 
 Set `IMAGE_VISION_CONFIG` to use a custom config file path.
+
+`QWEN_MODEL` is used for image analysis. `ANTHROPIC_MODEL` or `diagnostics.model` is used only for optional Anthropic model-assisted error diagnosis.
 
 ## Verify
 

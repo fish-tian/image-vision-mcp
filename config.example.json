@@ -18,5 +18,11 @@
   },
   "log": {
     "level": "info"
+  },
+  "diagnostics": {
+    "enabled": true,
+    "model": "claude-3-5-sonnet-latest",
+    "maxTokens": 1000,
+    "timeoutMs": 8000
   }
 }

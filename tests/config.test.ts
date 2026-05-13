@@ -31,6 +31,10 @@ describe('config', () => {
     expect(config.cache.maxMb).toBe(500);
     expect(config.image.fetchTimeoutMs).toBe(30_000);
     expect(config.log.level).toBe('info');
+    expect(config.diagnostics.enabled).toBe(true);
+    expect(config.diagnostics.model).toBe('');
+    expect(config.diagnostics.maxTokens).toBe(1_000);
+    expect(config.diagnostics.timeoutMs).toBe(8_000);
   });
 
   test('reads nested values from config file', async () => {
@@ -55,6 +59,12 @@ describe('config', () => {
       log: {
         level: 'debug',
       },
+      diagnostics: {
+        enabled: false,
+        model: 'file-diagnostic-model',
+        maxTokens: 222,
+        timeoutMs: 333,
+      },
     });
     resetConfigForTests();
 
@@ -72,6 +82,10 @@ describe('config', () => {
     expect(config.image.fetchTimeoutMs).toBe(5);
     expect(config.image.maxBytes).toBe(6);
     expect(config.log.level).toBe('debug');
+    expect(config.diagnostics.enabled).toBe(false);
+    expect(config.diagnostics.model).toBe('file-diagnostic-model');
+    expect(config.diagnostics.maxTokens).toBe(222);
+    expect(config.diagnostics.timeoutMs).toBe(333);
   });
 
   test('environment variables override config file', async () => {
@@ -82,6 +96,11 @@ describe('config', () => {
         model: 'file-model',
         maxTokens: 100,
       },
+      diagnostics: {
+        model: 'file-diagnostic-model',
+        maxTokens: 300,
+        timeoutMs: 400,
+      },
       cache: {
         ttlHours: 10,
       },
@@ -89,7 +108,11 @@ describe('config', () => {
     process.env.ANTHROPIC_AUTH_TOKEN = 'env-token';
     process.env.ANTHROPIC_BASE_URL = 'https://env.test';
     process.env.QWEN_MODEL = 'env-model';
+    process.env.ANTHROPIC_MODEL = 'env-diagnostic-model';
     process.env.VISION_MAX_TOKENS = '200';
+    process.env.DIAGNOSTICS_MAX_TOKENS = '500';
+    process.env.DIAGNOSTICS_TIMEOUT_MS = '600';
+    process.env.DIAGNOSTICS_ENABLED = 'false';
     process.env.CACHE_TTL_HOURS = '20';
     resetConfigForTests();
 
@@ -99,6 +122,10 @@ describe('config', () => {
     expect(config.api.baseUrl).toBe('https://env.test');
     expect(config.api.model).toBe('env-model');
     expect(config.api.maxTokens).toBe(200);
+    expect(config.diagnostics.enabled).toBe(false);
+    expect(config.diagnostics.model).toBe('env-diagnostic-model');
+    expect(config.diagnostics.maxTokens).toBe(500);
+    expect(config.diagnostics.timeoutMs).toBe(600);
     expect(config.cache.ttlHours).toBe(20);
   });
 

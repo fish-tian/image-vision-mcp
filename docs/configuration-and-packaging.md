@@ -104,6 +104,12 @@ config.example.json
   },
   "log": {
     "level": "info"
+  },
+  "diagnostics": {
+    "enabled": true,
+    "model": "claude-3-5-sonnet-latest",
+    "maxTokens": 1000,
+    "timeoutMs": 8000
   }
 }
 ```
@@ -131,6 +137,15 @@ config.example.json
 ### log
 
 - `level`: 日志等级，支持 `debug`、`info`、`warn`、`error`。也可以用 `LOG_LEVEL` 覆盖。
+
+### diagnostics
+
+- `enabled`: 是否启用错误诊断，默认 `true`。也可以用 `DIAGNOSTICS_ENABLED` 覆盖。
+- `model`: Anthropic 文本模型，只用于错误诊断。也可以用 `ANTHROPIC_MODEL` 覆盖。
+- `maxTokens`: 错误诊断最大输出 token。也可以用 `DIAGNOSTICS_MAX_TOKENS` 覆盖。
+- `timeoutMs`: 错误诊断超时时间。也可以用 `DIAGNOSTICS_TIMEOUT_MS` 覆盖。
+
+注意：`QWEN_MODEL` 只用于图片分析；`ANTHROPIC_MODEL` 或 `diagnostics.model` 只用于错误诊断，两者不要混用。
 
 ## 关键代码入口
 
@@ -208,6 +223,17 @@ lock timeout: 5000ms
 日志系统支持 `LOG_LEVEL` 或配置文件里的 `log.level`。
 
 日志仍然写入 `stderr`，不会污染 MCP stdio 协议。
+
+### `src/utils/errorDiagnostics.ts`
+
+错误诊断模块负责在 MCP tool 返回错误之前生成更适合展示给用户的说明。
+
+它分两层：
+
+- 本地诊断：根据 `ApiError` / `CacheError` 的错误码生成稳定建议，永远执行。
+- Anthropic 模型辅助诊断：如果配置了 `ANTHROPIC_MODEL` 或 `diagnostics.model`，并且 token 可用，就调用 Anthropic SDK 生成补充分析。
+
+模型辅助诊断失败不会覆盖原始错误，也不会递归再次诊断。最终错误返回会明确告诉 Claude Code：展示给用户，并询问是否需要修复。
 
 ## 安装脚本变化
 

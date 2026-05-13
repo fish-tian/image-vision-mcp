@@ -91,6 +91,12 @@ Example:
   },
   "log": {
     "level": "info"
+  },
+  "diagnostics": {
+    "enabled": true,
+    "model": "claude-3-5-sonnet-latest",
+    "maxTokens": 1000,
+    "timeoutMs": 8000
   }
 }
 ```
@@ -109,6 +115,7 @@ Supported environment variables:
 | --- | --- | --- | --- |
 | `ANTHROPIC_AUTH_TOKEN` | Yes | none | API token used by `@anthropic-ai/sdk`. |
 | `ANTHROPIC_BASE_URL` | No | SDK default | Anthropic-compatible API base URL. |
+| `ANTHROPIC_MODEL` | No | none | Anthropic text model used only for model-assisted error diagnosis. |
 | `QWEN_MODEL` | No | `openai/qwen3.6-plus` | Model identifier used for image analysis. |
 | `IMAGE_VISION_CONFIG` | No | `~/.image-vision-mcp/config.json` | Custom config file path. |
 | `VISION_MAX_TOKENS` | No | `64000` | Maximum output tokens. |
@@ -120,6 +127,11 @@ Supported environment variables:
 | `IMAGE_FETCH_TIMEOUT_MS` | No | `30000` | Remote image fetch timeout. |
 | `IMAGE_MAX_BYTES` | No | `20971520` | Maximum image size in bytes. |
 | `LOG_LEVEL` | No | `info` | `debug`, `info`, `warn`, or `error`. |
+| `DIAGNOSTICS_ENABLED` | No | `true` | Enable local and optional Anthropic model-assisted error diagnosis. |
+| `DIAGNOSTICS_MAX_TOKENS` | No | `1000` | Maximum output tokens for Anthropic error diagnosis. |
+| `DIAGNOSTICS_TIMEOUT_MS` | No | `8000` | Timeout for Anthropic error diagnosis. |
+
+`QWEN_MODEL` is used for image analysis. `ANTHROPIC_MODEL` is separate and used only to explain failures before the MCP tool returns an error to Claude Code.
 
 PowerShell example:
 

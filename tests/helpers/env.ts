@@ -8,6 +8,7 @@ const ENV_KEYS = [
   'IMAGE_VISION_CONFIG',
   'ANTHROPIC_AUTH_TOKEN',
   'ANTHROPIC_BASE_URL',
+  'ANTHROPIC_MODEL',
   'QWEN_MODEL',
   'VISION_MAX_TOKENS',
   'VISION_DEFAULT_PROMPT',
@@ -18,6 +19,9 @@ const ENV_KEYS = [
   'IMAGE_FETCH_TIMEOUT_MS',
   'IMAGE_MAX_BYTES',
   'LOG_LEVEL',
+  'DIAGNOSTICS_ENABLED',
+  'DIAGNOSTICS_MAX_TOKENS',
+  'DIAGNOSTICS_TIMEOUT_MS',
 ];
 
 export function snapshotEnv(): Record<string, string | undefined> {

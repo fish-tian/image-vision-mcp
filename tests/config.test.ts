@@ -31,6 +31,9 @@ describe('config', () => {
     expect(config.cache.maxMb).toBe(500);
     expect(config.image.fetchTimeoutMs).toBe(30_000);
     expect(config.log.level).toBe('info');
+    expect(config.log.call.enabled).toBe(true);
+    expect(config.log.call.dir).toBe('~/.image-vision-mcp/call-logs');
+    expect(config.log.call.includeText).toBe(true);
     expect(config.diagnostics.enabled).toBe(true);
     expect(config.diagnostics.model).toBe('');
     expect(config.diagnostics.maxTokens).toBe(1_000);
@@ -58,6 +61,11 @@ describe('config', () => {
       },
       log: {
         level: 'debug',
+        call: {
+          enabled: false,
+          dir: '~/custom-call-logs',
+          includeText: false,
+        },
       },
       diagnostics: {
         enabled: false,
@@ -82,6 +90,9 @@ describe('config', () => {
     expect(config.image.fetchTimeoutMs).toBe(5);
     expect(config.image.maxBytes).toBe(6);
     expect(config.log.level).toBe('debug');
+    expect(config.log.call.enabled).toBe(false);
+    expect(config.log.call.dir).toBe('~/custom-call-logs');
+    expect(config.log.call.includeText).toBe(false);
     expect(config.diagnostics.enabled).toBe(false);
     expect(config.diagnostics.model).toBe('file-diagnostic-model');
     expect(config.diagnostics.maxTokens).toBe(222);
@@ -138,6 +149,9 @@ describe('config', () => {
     process.env.DIAGNOSTICS_MAX_TOKENS = '500';
     process.env.DIAGNOSTICS_TIMEOUT_MS = '600';
     process.env.DIAGNOSTICS_ENABLED = 'false';
+    process.env.CALL_LOG_ENABLED = 'false';
+    process.env.CALL_LOG_DIR = '~/env-call-logs';
+    process.env.CALL_LOG_INCLUDE_TEXT = 'false';
     resetConfigForTests();
 
     const config = getConfig();
@@ -150,6 +164,9 @@ describe('config', () => {
     expect(config.diagnostics.model).toBe('env-diagnostic-model');
     expect(config.diagnostics.maxTokens).toBe(500);
     expect(config.diagnostics.timeoutMs).toBe(600);
+    expect(config.log.call.enabled).toBe(false);
+    expect(config.log.call.dir).toBe('~/env-call-logs');
+    expect(config.log.call.includeText).toBe(false);
   });
 
   test('empty config strings do not override environment variables', async () => {
@@ -190,6 +207,10 @@ describe('config', () => {
       },
       log: {
         level: 'verbose',
+        call: {
+          enabled: 'nope',
+          includeText: 'nope',
+        },
       },
     });
     process.env.IMAGE_MAX_BYTES = 'not-a-number';
@@ -201,6 +222,8 @@ describe('config', () => {
     expect(config.cache.ttlHours).toBe(24);
     expect(config.image.maxBytes).toBe(20 * 1024 * 1024);
     expect(config.log.level).toBe('info');
+    expect(config.log.call.enabled).toBe(true);
+    expect(config.log.call.includeText).toBe(true);
   });
 
   test('expands tilde paths', () => {

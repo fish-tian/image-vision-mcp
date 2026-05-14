@@ -13,6 +13,7 @@ An MCP server that exposes image analysis through a single `analyze_image` tool.
 - Expires sessions after 24 hours.
 - Cleans cache on startup, on expired session reads, and under cache pressure.
 - Writes structured JSON logs to `stderr`, keeping MCP stdio clean.
+- Writes detailed local call logs to JSONL files by default, with sensitive values masked.
 
 ## Requirements
 
@@ -82,7 +83,12 @@ Example:
     "maxBytes": 20971520
   },
   "log": {
-    "level": "info"
+    "level": "info",
+    "call": {
+      "enabled": true,
+      "dir": "~/.image-vision-mcp/call-logs",
+      "includeText": true
+    }
   },
   "diagnostics": {
     "enabled": true,
@@ -119,6 +125,9 @@ Supported environment variables:
 | `IMAGE_FETCH_TIMEOUT_MS` | No | `30000` | Remote image fetch timeout. |
 | `IMAGE_MAX_BYTES` | No | `20971520` | Maximum image size in bytes. |
 | `LOG_LEVEL` | No | `info` | `debug`, `info`, `warn`, or `error`. |
+| `CALL_LOG_ENABLED` | No | `true` | Write detailed local tool and API call logs. |
+| `CALL_LOG_DIR` | No | `~/.image-vision-mcp/call-logs` | Directory for daily JSONL call log files. |
+| `CALL_LOG_INCLUDE_TEXT` | No | `true` | Store full prompt and model output text; set false to store length and SHA256 only. |
 | `DIAGNOSTICS_ENABLED` | No | `true` | Enable local and optional model-assisted error diagnosis. |
 | `DIAGNOSTICS_MAX_TOKENS` | No | `1000` | Maximum output tokens for model-assisted error diagnosis. |
 | `DIAGNOSTICS_TIMEOUT_MS` | No | `8000` | Timeout for model-assisted error diagnosis. |
@@ -126,6 +135,18 @@ Supported environment variables:
 `QWEN_MODEL` is used for image analysis. `ANTHROPIC_MODEL` is separate and used only to explain failures before the MCP tool returns an error to Claude Code. Despite the environment variable name, this diagnostic model does not have to be a Claude model; it can be any compatible text model accepted by your configured endpoint.
 
 Empty strings in `config.json` are treated as unset and do not override environment variables.
+
+Detailed call logs are enabled by default and written to `~/.image-vision-mcp/call-logs/YYYY-MM-DD.jsonl`. They include `analyze_image` tool calls and upstream model API calls. Known sensitive fields such as tokens, API keys, passwords, secrets, authorization headers, image base64 payloads, and signed URL query parameters are retained as fields but written as `"********"`. To disable local call logging:
+
+```json
+{
+  "log": {
+    "call": {
+      "enabled": false
+    }
+  }
+}
+```
 
 PowerShell example:
 
@@ -289,5 +310,6 @@ bun run dev
 ## Notes
 
 - Logs are written to `stderr` as JSON lines so they do not interfere with MCP protocol traffic on stdio.
+- Detailed call logs are written locally as JSONL and mask known sensitive values with `********`.
 - Session history stores image references, not full image base64 content.
 - Missing or expired sessions return structured MCP tool errors.

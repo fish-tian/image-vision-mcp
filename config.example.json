@@ -17,7 +17,12 @@
     "maxBytes": 20971520
   },
   "log": {
-    "level": "info"
+    "level": "info",
+    "call": {
+      "enabled": true,
+      "dir": "~/.image-vision-mcp/call-logs",
+      "includeText": true
+    }
   },
   "diagnostics": {
     "enabled": true,

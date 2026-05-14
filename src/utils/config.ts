@@ -22,6 +22,11 @@ export interface ImageVisionConfig {
   };
   log: {
     level: 'debug' | 'info' | 'warn' | 'error';
+    call: {
+      enabled: boolean;
+      dir: string;
+      includeText: boolean;
+    };
   };
   diagnostics: {
     enabled: boolean;
@@ -60,6 +65,11 @@ const DEFAULT_CONFIG: Omit<ImageVisionConfig, 'configPath'> = {
   },
   log: {
     level: 'info',
+    call: {
+      enabled: true,
+      dir: '~/.image-vision-mcp/call-logs',
+      includeText: true,
+    },
   },
   diagnostics: {
     enabled: true,
@@ -144,6 +154,13 @@ function mergeConfig(
       ...defaults.log,
       ...fileConfig.log,
       level: logLevel(fileConfig.log?.level, defaults.log.level),
+      call: {
+        ...defaults.log.call,
+        ...fileConfig.log?.call,
+        enabled: booleanValue(fileConfig.log?.call?.enabled, defaults.log.call.enabled),
+        dir: nonEmptyString(fileConfig.log?.call?.dir, defaults.log.call.dir),
+        includeText: booleanValue(fileConfig.log?.call?.includeText, defaults.log.call.includeText),
+      },
     },
     diagnostics: {
       ...defaults.diagnostics,
@@ -181,6 +198,12 @@ function applyEnvDefaults(config: Omit<ImageVisionConfig, 'configPath'>): Omit<I
     },
     log: {
       level: logLevel(process.env.LOG_LEVEL, config.log.level),
+      call: {
+        ...config.log.call,
+        enabled: envBoolean('CALL_LOG_ENABLED', config.log.call.enabled),
+        dir: process.env.CALL_LOG_DIR || config.log.call.dir,
+        includeText: envBoolean('CALL_LOG_INCLUDE_TEXT', config.log.call.includeText),
+      },
     },
     diagnostics: {
       enabled: envBoolean('DIAGNOSTICS_ENABLED', config.diagnostics.enabled),

@@ -51,7 +51,12 @@ The config file shape is:
     "maxBytes": 20971520
   },
   "log": {
-    "level": "info"
+    "level": "info",
+    "call": {
+      "enabled": true,
+      "dir": "~/.image-vision-mcp/call-logs",
+      "includeText": true
+    }
   },
   "diagnostics": {
     "enabled": true,
@@ -70,6 +75,7 @@ Important distinction:
 ## Key Code Paths
 
 - `src/utils/config.ts`: reads config file, applies defaults, and overlays environment variables.
+- `src/utils/callLogger.ts`: writes local JSONL call logs and masks known sensitive values.
 - `src/utils/qwenApi.ts`: reads API token, base URL, image model, max tokens, and default prompt.
 - `src/utils/cache.ts`: reads cache directory, TTL, max size, and lock timeout.
 - `src/utils/imageReader.ts`: reads image fetch timeout and max image size.

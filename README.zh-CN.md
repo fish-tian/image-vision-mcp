@@ -13,6 +13,7 @@
 - 会话默认 24 小时过期。
 - 启动、读取过期会话、缓存超限时会自动清理。
 - 日志写入 `stderr`，不会污染 MCP stdio 协议。
+- 默认写入本地详细调用日志，已知敏感值会用星号遮蔽。
 
 ## 安装要求
 
@@ -88,7 +89,12 @@ claude mcp get image-vision
     "maxBytes": 20971520
   },
   "log": {
-    "level": "info"
+    "level": "info",
+    "call": {
+      "enabled": true,
+      "dir": "~/.image-vision-mcp/call-logs",
+      "includeText": true
+    }
   },
   "diagnostics": {
     "enabled": true,
@@ -114,8 +120,23 @@ IMAGE_VISION_CONFIG=/path/to/config.json
 | `QWEN_MODEL` | 否 | `openai/qwen3.6-plus` | 图片分析模型。也可以写入 `api.model`。 |
 | `ANTHROPIC_MODEL` | 否 | 无 | 仅用于错误诊断的文本模型。也可以写入 `diagnostics.model`。 |
 | `IMAGE_VISION_CONFIG` | 否 | `~/.image-vision-mcp/config.json` | 自定义配置文件路径。 |
+| `CALL_LOG_ENABLED` | 否 | `true` | 是否写入本地详细调用日志。 |
+| `CALL_LOG_DIR` | 否 | `~/.image-vision-mcp/call-logs` | 每日 JSONL 调用日志目录。 |
+| `CALL_LOG_INCLUDE_TEXT` | 否 | `true` | 是否保存完整 prompt 和模型输出；设为 false 时只保存长度和 SHA256。 |
 
 `QWEN_MODEL` 只用于图片分析。`ANTHROPIC_MODEL` 只用于请求失败时的错误诊断。虽然变量名叫 `ANTHROPIC_MODEL`，但它不一定必须是 Claude 模型，只要你的兼容接口支持该文本模型即可。
+
+详细调用日志默认写入 `~/.image-vision-mcp/call-logs/YYYY-MM-DD.jsonl`，覆盖 `analyze_image` 工具调用和上游模型 API 调用。已知敏感字段，例如 token、API key、password、secret、authorization、图片 base64 内容和带签名 URL query 参数，会保留字段名但值写为 `"********"`。如果要关闭：
+
+```json
+{
+  "log": {
+    "call": {
+      "enabled": false
+    }
+  }
+}
+```
 
 ## 使用方式
 

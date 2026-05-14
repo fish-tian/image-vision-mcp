@@ -1,100 +1,64 @@
 #!/usr/bin/env node
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import { pathToFileURL } from 'node:url';
 import { z } from 'zod';
 
 import { initCache, migrateOldCache } from './utils/cache.js';
-import { createCallId, summarizeToolInput, textForLog, writeCallLog } from './utils/callLogger.js';
-import { buildErrorResponse } from './utils/errorDiagnostics.js';
 import { formatError } from './utils/errors.js';
 import { logger } from './utils/logger.js';
-import { analyzeImage } from './utils/qwenApi.js';
+import { createAnalyzeImageHandler } from './analyzeImageTool.js';
 
-const server = new McpServer({
-  name: 'image-vision',
-  version: '1.0.0',
-});
+const analyzeImageInputSchema = {
+  source: z.union([z.string(), z.array(z.string())]).optional(),
+  session_id: z.string().optional(),
+  prompt: z.string().optional(),
+};
 
-server.tool(
-  'analyze_image',
-  'Analyze one or more images, then continue follow-up questions with session_id.',
-  {
-    source: z.union([z.string(), z.array(z.string())]).optional(),
-    session_id: z.string().optional(),
-    prompt: z.string().optional(),
-  },
-  async ({ source, session_id, prompt }) => {
-    const callId = createCallId();
-    const startedAt = Date.now();
-    const sources = typeof source === 'string' ? [source] : source ?? null;
+const analyzeImageOutputSchema = {
+  result: z.string(),
+  session_id: z.string(),
+};
 
-    await writeCallLog({
-      event: 'tool.analyze_image.start',
-      callId,
-      sessionId: session_id ?? null,
-      status: 'start',
-      data: summarizeToolInput(sources, session_id ?? null, prompt),
-    });
+export function createServer(): McpServer {
+  const server = new McpServer({
+    name: 'image-vision',
+    version: '1.0.0',
+  });
 
-    try {
-      const { result, session_id: returnedId } = await analyzeImage(
-        sources,
-        session_id ?? null,
-        prompt,
-        callId,
-      );
+  server.registerTool(
+    'analyze_image',
+    {
+      title: 'Analyze image',
+      description: [
+        'Analyze one or more images, then continue follow-up questions with session_id.',
+        'On success, present content[0].text exactly as returned by the upstream vision model.',
+        'Do not summarize, translate, rewrite, reformat, add headings, or append session_id.',
+        'Use structuredContent.session_id only for follow-up tool calls.',
+      ].join(' '),
+      inputSchema: analyzeImageInputSchema,
+      outputSchema: analyzeImageOutputSchema,
+      annotations: {
+        title: 'Analyze image',
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: true,
+      },
+      _meta: {
+        'image-vision/visible-text': 'verbatim-upstream-result',
+        'image-vision/session-id-field': 'structuredContent.session_id',
+      },
+    },
+    createAnalyzeImageHandler(),
+  );
 
-      await writeCallLog({
-        event: 'tool.analyze_image.success',
-        callId,
-        sessionId: returnedId,
-        durationMs: Date.now() - startedAt,
-        status: 'success',
-        data: {
-          result: textForLog(result),
-          resultLength: result.length,
-        },
-      });
-
-      return {
-        content: [
-          {
-            type: 'text' as const,
-            text: `${result}\n\n---\nsession_id: ${returnedId}`,
-          },
-        ],
-      };
-    } catch (error) {
-      logger.error('server', 'tool call failed', { error: formatError(error) });
-      await writeCallLog({
-        event: 'tool.analyze_image.error',
-        callId,
-        sessionId: session_id ?? null,
-        durationMs: Date.now() - startedAt,
-        status: 'error',
-        data: { error: formatError(error) },
-      });
-      const text = await buildErrorResponse(error, {
-        tool: 'analyze_image',
-        hasSource: Boolean(source),
-        hasSessionId: Boolean(session_id),
-        callId,
-      });
-      return {
-        content: [
-          {
-            type: 'text' as const,
-            text,
-          },
-        ],
-        isError: true,
-      };
-    }
-  },
-);
+  return server;
+}
 
 async function main(): Promise<void> {
   try {
+    const server = createServer();
     await migrateOldCache();
     await initCache();
     await server.connect(new StdioServerTransport());
@@ -105,4 +69,6 @@ async function main(): Promise<void> {
   }
 }
 
-main();
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main();
+}

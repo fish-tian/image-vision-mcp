@@ -64,7 +64,7 @@ claude mcp add -s user image-vision -- node C:\absolute\path\to\image-vision-mcp
 claude mcp get image-vision
 ```
 
-4. 重新打开 Claude Code 或开始一个新会话，然后调用 `analyze_image` 工具。
+4. 重新打开 Claude Code 或开始一个新会话，然后调用 `analyze_image` 工具。成功时，工具返回的可见文本只包含上游模型结果原文；后续追问使用 `structuredContent.session_id`。
 
 ## 配置方式
 

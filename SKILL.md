@@ -76,7 +76,7 @@ If the Claude Code process can see `ANTHROPIC_AUTH_TOKEN`, `ANTHROPIC_BASE_URL`,
 claude mcp get image-vision
 ```
 
-Start a new Claude Code session and use the `analyze_image` tool.
+Start a new Claude Code session and use the `analyze_image` tool. On success, the visible tool text contains only the upstream model response; use `structuredContent.session_id` for follow-up calls.
 
 ## Update Configuration
 

@@ -184,7 +184,7 @@ analyze_image
 }
 ```
 
-工具会返回模型分析结果和当前可继续使用的 `session_id`。
+工具返回的可见文本只包含上游模型分析结果原文。当前可继续使用的 `session_id` 会放在 `structuredContent.session_id` 中，用于后续追问。
 
 ## 开发命令
 

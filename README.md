@@ -252,7 +252,7 @@ Follow-up:
 }
 ```
 
-The tool returns the model response and the active `session_id`.
+The visible text returned by the tool contains only the upstream model response. The active `session_id` is returned in `structuredContent.session_id` for follow-up calls.
 
 ## Claude Code Configuration
 

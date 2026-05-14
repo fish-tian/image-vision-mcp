@@ -118,6 +118,8 @@ async function callVisionApi(
   const client = new Anthropic({
     apiKey,
     baseURL: config.api.baseUrl,
+    fetch: globalThis.fetch as never,
+    httpAgent: false as never,
   });
   const model = config.api.model;
 

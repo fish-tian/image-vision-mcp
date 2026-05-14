@@ -154,6 +154,8 @@ export async function anthropicDiagnose(
     const client = new Anthropic({
       apiKey: config.api.authToken,
       baseURL: config.api.baseUrl,
+      fetch: globalThis.fetch as never,
+      httpAgent: false as never,
     });
     const response = await client.messages.create(
       {

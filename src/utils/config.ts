@@ -5,6 +5,7 @@ import { isAbsolute, join, normalize } from 'node:path';
 export interface ImageVisionConfig {
   api: {
     authToken: string;
+    authTokenSource: 'config' | 'env' | 'missing';
     baseUrl?: string;
     model: string;
     maxTokens: number;
@@ -49,6 +50,7 @@ const DEFAULT_CONFIG_PATH = '~/.image-vision-mcp/config.json';
 const DEFAULT_CONFIG: Omit<ImageVisionConfig, 'configPath'> = {
   api: {
     authToken: '',
+    authTokenSource: 'missing',
     model: 'openai/qwen3.6-plus',
     maxTokens: 64_000,
     defaultPrompt: 'Please analyze the image content.',
@@ -90,7 +92,14 @@ export function getConfig(): ImageVisionConfig {
   const fileConfig = readConfigFile(configPath);
   const defaultsWithEnv = applyEnvDefaults(DEFAULT_CONFIG);
   const merged = mergeConfig(defaultsWithEnv, fileConfig);
-  cachedConfig = { ...merged, configPath };
+  cachedConfig = {
+    ...merged,
+    api: {
+      ...merged.api,
+      authTokenSource: authTokenSource(fileConfig, merged.api.authToken),
+    },
+    configPath,
+  };
   return cachedConfig;
 }
 
@@ -131,6 +140,7 @@ function mergeConfig(
       ...defaults.api,
       ...fileConfig.api,
       authToken: nonEmptyString(fileConfig.api?.authToken, defaults.api.authToken),
+      authTokenSource: defaults.api.authTokenSource,
       baseUrl: optionalNonEmptyString(fileConfig.api?.baseUrl, defaults.api.baseUrl),
       maxTokens: positiveNumber(fileConfig.api?.maxTokens, defaults.api.maxTokens),
       defaultPrompt: nonEmptyString(fileConfig.api?.defaultPrompt, defaults.api.defaultPrompt),
@@ -179,6 +189,7 @@ function applyEnvDefaults(config: Omit<ImageVisionConfig, 'configPath'>): Omit<I
     api: {
       ...config.api,
       authToken: process.env.ANTHROPIC_AUTH_TOKEN || config.api.authToken,
+      authTokenSource: process.env.ANTHROPIC_AUTH_TOKEN ? 'env' : config.api.authTokenSource,
       baseUrl: process.env.ANTHROPIC_BASE_URL || config.api.baseUrl,
       model: process.env.QWEN_MODEL || config.api.model,
       maxTokens: envPositiveNumber('VISION_MAX_TOKENS', config.api.maxTokens),
@@ -234,6 +245,21 @@ function nonEmptyString(value: unknown, fallback: string): string {
 
 function optionalNonEmptyString(value: unknown, fallback: string | undefined): string | undefined {
   return typeof value === 'string' && value.trim() ? value : fallback;
+}
+
+function authTokenSource(
+  fileConfig: PartialConfig,
+  authToken: string,
+): ImageVisionConfig['api']['authTokenSource'] {
+  if (typeof fileConfig.api?.authToken === 'string' && fileConfig.api.authToken.trim()) {
+    return 'config';
+  }
+
+  if (authToken) {
+    return 'env';
+  }
+
+  return 'missing';
 }
 
 function booleanValue(value: unknown, fallback: boolean): boolean {

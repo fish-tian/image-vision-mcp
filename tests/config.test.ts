@@ -27,6 +27,7 @@ describe('config', () => {
     expect(config.api.model).toBe('openai/qwen3.6-plus');
     expect(config.api.maxTokens).toBe(64_000);
     expect(config.api.authToken).toBe('');
+    expect(config.api.authTokenSource).toBe('missing');
     expect(config.cache.ttlHours).toBe(24);
     expect(config.cache.maxMb).toBe(500);
     expect(config.image.fetchTimeoutMs).toBe(30_000);
@@ -79,6 +80,7 @@ describe('config', () => {
     const config = getConfig();
 
     expect(config.api.authToken).toBe('file-token');
+    expect(config.api.authTokenSource).toBe('config');
     expect(config.api.baseUrl).toBe('https://example.test');
     expect(config.api.model).toBe('file-model');
     expect(config.api.maxTokens).toBe(123);
@@ -130,6 +132,7 @@ describe('config', () => {
     const config = getConfig();
 
     expect(config.api.authToken).toBe('file-token');
+    expect(config.api.authTokenSource).toBe('config');
     expect(config.api.baseUrl).toBe('https://file.test');
     expect(config.api.model).toBe('file-model');
     expect(config.api.maxTokens).toBe(100);
@@ -157,6 +160,7 @@ describe('config', () => {
     const config = getConfig();
 
     expect(config.api.authToken).toBe('env-token');
+    expect(config.api.authTokenSource).toBe('env');
     expect(config.api.baseUrl).toBe('https://env.test');
     expect(config.api.model).toBe('env-model');
     expect(config.api.maxTokens).toBe(200);
@@ -191,6 +195,7 @@ describe('config', () => {
     const config = getConfig();
 
     expect(config.api.authToken).toBe('env-token');
+    expect(config.api.authTokenSource).toBe('env');
     expect(config.api.baseUrl).toBe('https://env.test');
     expect(config.api.model).toBe('env-model');
     expect(config.api.defaultPrompt).toBe('env prompt');

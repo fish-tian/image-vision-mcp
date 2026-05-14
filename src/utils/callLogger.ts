@@ -18,7 +18,10 @@ const SENSITIVE_EXACT_KEYS = new Set([
   'credential',
 ]);
 const NON_SECRET_TOKEN_KEYS = new Set(['maxtoken', 'maxtokens', 'inputtokens', 'outputtokens']);
+const NON_SECRET_AUTH_KEYS = new Set(['authtokenconfigured', 'authtokensource']);
 const IMAGE_DATA_KEYS = new Set(['base64', 'data', 'bin', 'binary']);
+const MAX_ERROR_DEPTH = 4;
+const MAX_OBJECT_KEYS = 50;
 
 type CallLogStatus = 'start' | 'success' | 'error';
 type CallLogData = Record<string, unknown>;
@@ -122,6 +125,10 @@ export function textForLog(text: string | undefined): unknown {
   };
 }
 
+export function errorDetailForLog(error: unknown): unknown {
+  return serializeError(error, 0, new WeakSet<object>());
+}
+
 export function sanitizeForLog(value: unknown, includeText = getConfig().log.call.includeText): unknown {
   if (value === null || value === undefined) {
     return value;
@@ -142,7 +149,7 @@ export function sanitizeForLog(value: unknown, includeText = getConfig().log.cal
   const sanitized: Record<string, unknown> = {};
   for (const [key, child] of Object.entries(value)) {
     if (isSensitiveKey(key) || isImageDataKey(key)) {
-      sanitized[key] = MASK;
+      sanitized[key] = child === '' || child === null || child === undefined ? child : MASK;
       continue;
     }
 
@@ -169,8 +176,75 @@ function sanitizeString(value: string): string {
   }
 }
 
+function serializeError(error: unknown, depth: number, seen: WeakSet<object>): unknown {
+  if (error === null || error === undefined) {
+    return error;
+  }
+
+  if (typeof error !== 'object') {
+    return error;
+  }
+
+  if (seen.has(error)) {
+    return '[Circular]';
+  }
+
+  if (depth >= MAX_ERROR_DEPTH) {
+    return '[MaxDepth]';
+  }
+
+  seen.add(error);
+  const source = error as Record<string, unknown>;
+  const detail: Record<string, unknown> = {};
+
+  if (error instanceof Error) {
+    detail.name = error.name;
+    detail.message = error.message;
+  }
+
+  copyKnownErrorField(detail, source, 'code');
+  copyKnownErrorField(detail, source, 'status');
+  copyKnownErrorField(detail, source, 'type');
+  copyKnownErrorField(detail, source, 'requestId');
+  copyKnownErrorField(detail, source, 'request_id', 'requestId');
+  copyKnownErrorField(detail, source, 'headers');
+  copyKnownErrorField(detail, source, 'body');
+  copyKnownErrorField(detail, source, 'response');
+  copyKnownErrorField(detail, source, 'error');
+
+  for (const key of Object.keys(source).slice(0, MAX_OBJECT_KEYS)) {
+    if (key in detail || key === 'stack' || key === 'cause') {
+      continue;
+    }
+
+    detail[key] = serializeError(source[key], depth + 1, seen);
+  }
+
+  const cause = error instanceof Error ? error.cause : source.cause;
+  if (cause !== undefined) {
+    detail.cause = serializeError(cause, depth + 1, seen);
+  }
+
+  return detail;
+}
+
+function copyKnownErrorField(
+  target: Record<string, unknown>,
+  source: Record<string, unknown>,
+  from: string,
+  to = from,
+): void {
+  if (source[from] !== undefined) {
+    target[to] = serializeError(source[from], 1, new WeakSet<object>());
+  }
+}
+
 function isSensitiveKey(key: string): boolean {
   const normalized = key.toLowerCase().replace(/[-_\s]/g, '');
+  if (NON_SECRET_AUTH_KEYS.has(normalized)) {
+    return false;
+  }
+
   if (SENSITIVE_EXACT_KEYS.has(normalized) || normalized.endsWith('apikey') || normalized.endsWith('accesskey')) {
     return true;
   }

@@ -9,8 +9,8 @@ import {
   withLock,
   type StoredMessageParam,
 } from './cache.js';
-import { summarizeApiMessages, textForLog, writeCallLog } from './callLogger.js';
-import { getConfig } from './config.js';
+import { errorDetailForLog, summarizeApiMessages, textForLog, writeCallLog } from './callLogger.js';
+import { getConfig, type ImageVisionConfig } from './config.js';
 import { ApiError, CacheError, formatError } from './errors.js';
 import { readImageSource } from './imageReader.js';
 import { logger } from './logger.js';
@@ -106,7 +106,11 @@ async function callVisionApi(
       sessionId,
       durationMs: Date.now() - startedAt,
       status: 'error',
-      data: { error: formatError(error) },
+      data: {
+        ...apiConfigForLog(config),
+        error: formatError(error),
+        errorDetail: errorDetailForLog(error),
+      },
     });
     throw error;
   }
@@ -127,6 +131,7 @@ async function callVisionApi(
       data: {
         model,
         maxTokens: config.api.maxTokens,
+        ...apiConfigForLog(config),
         messageCount: messages.length,
         ...summarizeApiMessages(messages),
       },
@@ -166,7 +171,11 @@ async function callVisionApi(
         sessionId,
         durationMs: Date.now() - startedAt,
         status: 'error',
-        data: { error: formatError(error) },
+        data: {
+          ...apiConfigForLog(config),
+          error: formatError(error),
+          errorDetail: errorDetailForLog(error),
+        },
       });
       throw error;
     }
@@ -178,8 +187,23 @@ async function callVisionApi(
       sessionId,
       durationMs: Date.now() - startedAt,
       status: 'error',
-      data: { error: formatError(apiError) },
+      data: {
+        ...apiConfigForLog(config),
+        error: formatError(apiError),
+        errorDetail: errorDetailForLog(apiError),
+      },
     });
     throw apiError;
   }
+}
+
+function apiConfigForLog(config: ImageVisionConfig): Record<string, unknown> {
+  return {
+    baseUrl: config.api.baseUrl || 'sdk-default',
+    authToken: config.api.authToken ? '********' : '',
+    authTokenConfigured: Boolean(config.api.authToken),
+    authTokenSource: config.api.authTokenSource,
+    model: config.api.model,
+    maxTokens: config.api.maxTokens,
+  };
 }

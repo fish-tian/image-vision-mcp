@@ -3,6 +3,7 @@ import { readdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
 import {
+  errorDetailForLog,
   sanitizeForLog,
   textForLog,
   writeCallLog,
@@ -104,6 +105,8 @@ describe('call logger', () => {
     expect((sanitized.nested as Record<string, unknown>).base64).toBe('********');
     expect(((sanitized.nested as Record<string, unknown>).source as Record<string, unknown>).data).toBe('********');
     expect(((sanitized.nested as Record<string, unknown>).source as Record<string, unknown>).media_type).toBe('image/png');
+    expect(sanitizeForLog({ authToken: '' })).toEqual({ authToken: '' });
+    expect(sanitizeForLog({ maxTokens: 123 })).toEqual({ maxTokens: 123 });
   });
 
   test('masks sensitive URL query parameters', () => {
@@ -133,5 +136,37 @@ describe('call logger', () => {
 
     expect(summary.length).toBe('secret prompt'.length);
     expect(summary.sha256).toHaveLength(64);
+  });
+
+  test('serializes error details and masks sensitive nested fields', () => {
+    const cause = new Error('socket failed');
+    const error = Object.assign(new Error('request failed'), {
+      status: 401,
+      code: 'unauthorized',
+      type: 'invalid_request_error',
+      request_id: 'req_123',
+      headers: {
+        authorization: 'Bearer test-token',
+        'x-request-id': 'req_123',
+      },
+      body: {
+        message: 'bad token',
+        token: 'test-token',
+      },
+      cause,
+    });
+
+    const detail = sanitizeForLog(errorDetailForLog(error)) as Record<string, any>;
+
+    expect(detail.name).toBe('Error');
+    expect(detail.message).toBe('request failed');
+    expect(detail.status).toBe(401);
+    expect(detail.code).toBe('unauthorized');
+    expect(detail.type).toBe('invalid_request_error');
+    expect(detail.requestId).toBe('req_123');
+    expect(detail.headers.authorization).toBe('********');
+    expect(detail.headers['x-request-id']).toBe('req_123');
+    expect(detail.body.token).toBe('********');
+    expect(detail.cause.message).toBe('socket failed');
   });
 });

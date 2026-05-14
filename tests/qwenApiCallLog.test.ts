@@ -59,6 +59,7 @@ describe('qwen API call logging', () => {
     await writeJson(tempConfigPath, {
       api: {
         authToken: 'test-token',
+        baseUrl: 'https://api.example.test/v1?signature=secret&region=hk',
         model: 'test-model',
         maxTokens: 123,
       },
@@ -89,6 +90,10 @@ describe('qwen API call logging', () => {
     expect(request?.sessionId).toBe(result.session_id);
     expect(request?.data.model).toBe('test-model');
     expect(request?.data.maxTokens).toBe(123);
+    expect(request?.data.baseUrl).toBe('https://api.example.test/v1?signature=********&region=hk');
+    expect(request?.data.authToken).toBe('********');
+    expect(request?.data.authTokenConfigured).toBe(true);
+    expect(request?.data.authTokenSource).toBe('config');
     expect(request?.data.imageCount).toBe(1);
     expect(JSON.stringify(request)).not.toContain('test-token');
     expect(JSON.stringify(request)).not.toContain(Buffer.from(new Uint8Array([137, 80, 78, 71])).toString('base64'));
@@ -117,7 +122,70 @@ describe('qwen API call logging', () => {
     const error = entries.find((entry) => entry.event === 'api.vision.error');
     expect(error?.callId).toBe('call_missing_token');
     expect(error?.status).toBe('error');
+    expect(error?.data.baseUrl).toBe('sdk-default');
+    expect(error?.data.authToken).toBe('');
+    expect(error?.data.authTokenConfigured).toBe(false);
+    expect(error?.data.authTokenSource).toBe('missing');
+    expect(error?.data.model).toBe('openai/qwen3.6-plus');
+    expect(error?.data.maxTokens).toBe(64_000);
     expect(error?.data.error).toContain('API_TOKEN_MISSING');
+    expect(error?.data.errorDetail.message).toContain('ANTHROPIC_AUTH_TOKEN');
+  });
+
+  test('writes SDK error details and masks sensitive fields', async () => {
+    streamMock = mock(() => {
+      throw Object.assign(new Error('upstream rejected request'), {
+        status: 401,
+        code: 'unauthorized',
+        type: 'authentication_error',
+        request_id: 'req_456',
+        headers: {
+          authorization: 'Bearer test-token',
+          'x-request-id': 'req_456',
+        },
+        body: {
+          message: 'invalid token',
+          apiKey: 'test-token',
+        },
+        cause: Object.assign(new Error('http 401'), {
+          token: 'test-token',
+        }),
+      });
+    });
+    await writeJson(tempConfigPath, {
+      api: {
+        authToken: 'test-token',
+        baseUrl: 'https://api.example.test/v1',
+        model: 'test-model',
+      },
+      cache: {
+        dir: cacheDir,
+      },
+      log: {
+        call: {
+          enabled: true,
+          dir: logDir,
+        },
+      },
+    });
+    resetConfigForTests();
+    await initCache();
+
+    await expect(analyzeImage([imagePath], null, 'describe', 'call_sdk_error')).rejects.toThrow('Image analysis API request failed');
+
+    const entries = await readLogEntries();
+    const error = entries.find((entry) => entry.event === 'api.vision.error');
+    expect(error?.callId).toBe('call_sdk_error');
+    expect(error?.data.error).toContain('API_REQUEST_FAILED');
+    expect(error?.data.errorDetail.cause.message).toBe('upstream rejected request');
+    expect(error?.data.errorDetail.cause.status).toBe(401);
+    expect(error?.data.errorDetail.cause.code).toBe('unauthorized');
+    expect(error?.data.errorDetail.cause.type).toBe('authentication_error');
+    expect(error?.data.errorDetail.cause.requestId).toBe('req_456');
+    expect(error?.data.errorDetail.cause.headers.authorization).toBe('********');
+    expect(error?.data.errorDetail.cause.headers['x-request-id']).toBe('req_456');
+    expect(error?.data.errorDetail.cause.body.apiKey).toBe('********');
+    expect(error?.data.errorDetail.cause.cause.token).toBe('********');
   });
 });
 

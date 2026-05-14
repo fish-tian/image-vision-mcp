@@ -29,11 +29,19 @@ An MCP server that exposes image analysis through a single `analyze_image` tool.
 
 Download `image-vision-mcp-vX.Y.Z.zip` from GitHub Releases and extract it to a permanent folder. The release zip is self-contained and does not require `npm install` or `bun install`.
 
+For a first install, extract the zip to the folder you want to keep using, such as `~/mcp/image-vision-mcp` or `C:\Users\you\mcp\image-vision-mcp`.
+
+For an update, delete the old release install folder, then extract the new zip to the same path. `Expand-Archive -Force` and graphical "replace existing files" flows overwrite matching filenames but do not remove files that no longer exist in the new release, so a clean folder replacement is recommended. If deleting or replacing files fails because they are in use, close Claude Code sessions that may be using this MCP server and try again.
+
+Treat the extracted release folder as replaceable. Keep persistent user configuration in `~/.image-vision-mcp/config.json`, not inside the release install folder.
+
 Register the server with Claude Code:
 
 ```bash
 claude mcp add -s user image-vision -- node /absolute/path/to/image-vision-mcp/dist/index.js
 ```
+
+If you update in the same folder, you usually do not need to run `claude mcp add` again. Re-register only when the absolute path to `dist/index.js` changes.
 
 The server reads non-empty `~/.image-vision-mcp/config.json` values first, then environment variables, then built-in defaults. If Claude Code can see `ANTHROPIC_AUTH_TOKEN`, `ANTHROPIC_BASE_URL`, `QWEN_MODEL`, or `ANTHROPIC_MODEL`, the tool uses them automatically. Otherwise, copy `config.example.json` to `~/.image-vision-mcp/config.json` and fill in the values.
 

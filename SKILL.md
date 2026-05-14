@@ -38,6 +38,12 @@ Example locations:
 C:\Users\you\mcp\image-vision-mcp
 ```
 
+For a first install, extract the zip to that directory and keep using that path.
+
+For an update, delete the old release install directory, then extract the new zip to the same path. `Expand-Archive -Force` and graphical "replace existing files" flows overwrite matching filenames but do not remove files that no longer exist in the new release. If deleting or replacing files fails because they are in use, close Claude Code sessions that may be using this MCP server and try again.
+
+Treat the extracted release directory as replaceable. Keep persistent user configuration in `~/.image-vision-mcp/config.json`, not inside the release install directory.
+
 2. Register the MCP server with Claude Code.
 
 Use the absolute path to `dist/index.js` inside the extracted release directory.
@@ -53,6 +59,8 @@ Windows PowerShell:
 ```powershell
 claude mcp add -s user image-vision -- node C:\absolute\path\to\image-vision-mcp\dist\index.js
 ```
+
+If you update in the same directory, you usually do not need to run `claude mcp add` again. Re-register only when the absolute path to `dist/index.js` changes.
 
 The server reads configuration in this order:
 

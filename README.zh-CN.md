@@ -27,6 +27,12 @@
 
 下载 `image-vision-mcp-vX.Y.Z.zip`，解压到一个固定目录。release zip 已经内置运行依赖，不需要执行 `npm install` 或 `bun install`。
 
+首次安装时，把 zip 解压到之后会长期使用的目录，例如 `~/mcp/image-vision-mcp` 或 `C:\Users\you\mcp\image-vision-mcp`。
+
+更新安装时，先删除旧的 release 安装目录，然后把新版 zip 解压到同一路径。`Expand-Archive -Force` 和图形界面的“替换现有文件”通常只会覆盖同名文件，不会删除新版 release 中已经不存在的旧文件，所以推荐先清空旧目录再解压。如果删除或替换文件时提示被占用，再关闭正在使用这个 MCP Server 的 Claude Code 会话后重试。
+
+请把解压后的 release 目录当作可替换产物。持久用户配置应保存在 `~/.image-vision-mcp/config.json`，不要放在 release 安装目录里。
+
 注册到 Claude Code：
 
 ```bash
@@ -38,6 +44,8 @@ Windows PowerShell 示例：
 ```powershell
 claude mcp add -s user image-vision -- node C:\absolute\path\to\image-vision-mcp\dist\index.js
 ```
+
+如果更新时仍然解压到同一路径，通常不需要重新执行 `claude mcp add`。只有 `dist/index.js` 的绝对路径变化时才需要重新注册。
 
 验证：
 

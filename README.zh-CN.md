@@ -193,8 +193,12 @@ bun run test
 bun run typecheck
 bun run build
 bun run build:bundle
+bun run build:bundle:debug
 bun run package
+bun run package:debug
 ```
+
+默认 `build:bundle` / `package` 会生成压缩后的 release。排查 bundle 或运行时问题时，可以使用 `build:bundle:debug` / `package:debug` 生成不压缩的版本。
 
 release 用户不需要这些命令，只需要运行：
 

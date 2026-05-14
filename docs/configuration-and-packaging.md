@@ -96,6 +96,14 @@ It runs:
 bun run build:bundle
 ```
 
+`build:bundle` produces the default minified release bundle. For bundle or runtime debugging, use:
+
+```bash
+bun run package:debug
+```
+
+It runs `bun run build:bundle:debug` first, which writes a non-minified `dist/index.js`, then reuses `scripts/package-release.ts` to create the zip.
+
 Then `scripts/package-release.ts` creates:
 
 ```text
@@ -154,7 +162,10 @@ bun install
 bun run test
 bun run typecheck
 bun run build
+bun run build:bundle
+bun run build:bundle:debug
 bun run package
+bun run package:debug
 ```
 
 This development workflow is separate from release usage. Release users only need Node.js, Claude Code, the release zip, and a config file.

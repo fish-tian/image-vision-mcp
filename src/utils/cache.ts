@@ -13,6 +13,7 @@ import { basename, join } from 'node:path';
 
 import type { ImageData } from './imageReader.js';
 import { imageFromBuffer } from './imageReader.js';
+import { errorDetailForLog, writeCallLog } from './callLogger.js';
 import { expandPath, getConfig } from './config.js';
 import { CacheError } from './errors.js';
 import { logger } from './logger.js';
@@ -134,12 +135,13 @@ export async function initCache(): Promise<void> {
   }
 }
 
-export async function createSession(images: ImageData[], _prompt?: string): Promise<string> {
+export async function createSession(images: ImageData[], _prompt?: string, callId?: string): Promise<string> {
   const sessionId = `img_${randomUUID().replaceAll('-', '')}`;
   const now = Date.now();
   const imageRefs = images.map(({ hash, mediaType, size }) => ({ hash, mediaType, size }));
   const meta: SessionMeta = { sessionId, createdAt: now, lastAccessAt: now, imageRefs };
   const history: SessionHistory = { sessionId, messages: [], updatedAt: now };
+  const startedAt = Date.now();
 
   try {
     const paths = cachePaths();
@@ -156,17 +158,49 @@ export async function createSession(images: ImageData[], _prompt?: string): Prom
     await atomicWriteJson(metaPath(sessionId), meta);
     await atomicWriteJson(historyPath(sessionId), history);
     logger.info('cache', 'created session', { sessionId, imageCount: images.length });
+    await writeCallLog({
+      event: 'cache.session.create',
+      callId,
+      sessionId,
+      durationMs: Date.now() - startedAt,
+      status: 'success',
+      data: {
+        imageCount: images.length,
+        totalBytes: images.reduce((total, image) => total + image.size, 0),
+      },
+    });
     return sessionId;
   } catch (error) {
+    await writeCallLog({
+      event: 'cache.session.create',
+      callId,
+      sessionId,
+      durationMs: Date.now() - startedAt,
+      status: 'error',
+      data: {
+        imageCount: images.length,
+        totalBytes: images.reduce((total, image) => total + image.size, 0),
+        errorDetail: errorDetailForLog(error),
+      },
+    });
     throw new CacheError('CACHE_WRITE_FAILED', `Failed to create session ${sessionId}`, error);
   }
 }
 
-export async function readSession(sessionId: string): Promise<SessionData | null> {
+export async function readSession(sessionId: string, callId?: string): Promise<SessionData | null> {
+  const startedAt = Date.now();
   try {
     const meta = await readJson<SessionMeta>(metaPath(sessionId));
 
     if (!meta) {
+      await writeCallLog({
+        event: 'cache.session.read',
+        callId,
+        sessionId,
+        durationMs: Date.now() - startedAt,
+        status: 'success',
+        data: { hit: false },
+      });
       return null;
     }
 
@@ -178,6 +212,14 @@ export async function readSession(sessionId: string): Promise<SessionData | null
 
     const history = await readJson<SessionHistory>(historyPath(sessionId));
     if (!history) {
+      await writeCallLog({
+        event: 'cache.session.read',
+        callId,
+        sessionId,
+        durationMs: Date.now() - startedAt,
+        status: 'success',
+        data: { hit: false, imageCount: meta.imageRefs.length },
+      });
       return null;
     }
 
@@ -188,8 +230,28 @@ export async function readSession(sessionId: string): Promise<SessionData | null
     }
 
     await touchSession(meta);
+    await writeCallLog({
+      event: 'cache.session.read',
+      callId,
+      sessionId,
+      durationMs: Date.now() - startedAt,
+      status: 'success',
+      data: {
+        hit: true,
+        imageCount: meta.imageRefs.length,
+        messageCount: history.messages.length,
+      },
+    });
     return { meta: { ...meta, lastAccessAt: Date.now() }, history, images };
   } catch (error) {
+    await writeCallLog({
+      event: 'cache.session.read',
+      callId,
+      sessionId,
+      durationMs: Date.now() - startedAt,
+      status: 'error',
+      data: { errorDetail: errorDetailForLog(error) },
+    });
     if (error instanceof CacheError) {
       throw error;
     }
@@ -201,7 +263,9 @@ export async function readSession(sessionId: string): Promise<SessionData | null
 export async function updateHistory(
   sessionId: string,
   messages: StoredMessageParam[],
+  callId?: string,
 ): Promise<void> {
+  const startedAt = Date.now();
   try {
     const history: SessionHistory = {
       sessionId,
@@ -216,7 +280,28 @@ export async function updateHistory(
     }
 
     logger.info('cache', 'updated history', { sessionId, messageCount: messages.length });
+    await writeCallLog({
+      event: 'cache.session.update',
+      callId,
+      sessionId,
+      durationMs: Date.now() - startedAt,
+      status: 'success',
+      data: {
+        messageCount: messages.length,
+      },
+    });
   } catch (error) {
+    await writeCallLog({
+      event: 'cache.session.update',
+      callId,
+      sessionId,
+      durationMs: Date.now() - startedAt,
+      status: 'error',
+      data: {
+        messageCount: messages.length,
+        errorDetail: errorDetailForLog(error),
+      },
+    });
     throw new CacheError('CACHE_WRITE_FAILED', `Failed to update history for session ${sessionId}`, error);
   }
 }

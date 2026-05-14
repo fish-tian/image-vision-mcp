@@ -3,6 +3,7 @@ import { readFile, stat } from 'node:fs/promises';
 import { extname } from 'node:path';
 
 import { getConfig } from './config.js';
+import { errorDetailForLog, writeCallLog } from './callLogger.js';
 import { ApiError } from './errors.js';
 import { logger } from './logger.js';
 
@@ -39,11 +40,24 @@ export function imageFromBuffer(buffer: Buffer, mediaType: string): ImageData {
   };
 }
 
-export async function readImageSource(source: string): Promise<ImageData> {
+export async function readImageSource(source: string, callId?: string): Promise<ImageData> {
+  const startedAt = Date.now();
+  const sourceType = source.startsWith('http://') || source.startsWith('https://') ? 'url' : 'file';
   try {
     const config = getConfig();
+    await writeCallLog({
+      event: 'image.read.start',
+      callId,
+      status: 'start',
+      data: {
+        sourceType,
+        source,
+        maxBytes: config.image.maxBytes,
+        fetchTimeoutMs: sourceType === 'url' ? config.image.fetchTimeoutMs : undefined,
+      },
+    });
 
-    if (source.startsWith('http://') || source.startsWith('https://')) {
+    if (sourceType === 'url') {
       logger.info('image', 'downloading image', { source });
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), config.image.fetchTimeoutMs);
@@ -67,7 +81,23 @@ export async function readImageSource(source: string): Promise<ImageData> {
       const contentType = response.headers.get('content-type')?.split(';')[0]?.trim();
       const buffer = Buffer.from(await response.arrayBuffer());
       assertImageSize(buffer.byteLength, config.image.maxBytes);
-      return imageFromBuffer(buffer, contentType || inferMimeType(source));
+      const image = imageFromBuffer(buffer, contentType || inferMimeType(source));
+      await writeCallLog({
+        event: 'image.read.success',
+        callId,
+        durationMs: Date.now() - startedAt,
+        status: 'success',
+        data: {
+          sourceType,
+          source,
+          contentType,
+          contentLength: contentLength ? Number(contentLength) : undefined,
+          size: image.size,
+          mediaType: image.mediaType,
+          hashPrefix: image.hash.slice(0, 12),
+        },
+      });
+      return image;
     }
 
     logger.info('image', 'reading local image', { source });
@@ -75,8 +105,34 @@ export async function readImageSource(source: string): Promise<ImageData> {
     assertImageSize(file.size, config.image.maxBytes);
     const buffer = await readFile(source);
     assertImageSize(buffer.byteLength, config.image.maxBytes);
-    return imageFromBuffer(buffer, inferMimeType(source));
+    const image = imageFromBuffer(buffer, inferMimeType(source));
+    await writeCallLog({
+      event: 'image.read.success',
+      callId,
+      durationMs: Date.now() - startedAt,
+      status: 'success',
+      data: {
+        sourceType,
+        source,
+        size: image.size,
+        mediaType: image.mediaType,
+        hashPrefix: image.hash.slice(0, 12),
+      },
+    });
+    return image;
   } catch (error) {
+    await writeCallLog({
+      event: 'image.read.error',
+      callId,
+      durationMs: Date.now() - startedAt,
+      status: 'error',
+      data: {
+        sourceType,
+        source,
+        error: error instanceof ApiError ? error.message : String(error),
+        errorDetail: errorDetailForLog(error),
+      },
+    });
     if (error instanceof ApiError) {
       throw error;
     }

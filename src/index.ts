@@ -78,6 +78,7 @@ server.tool(
         tool: 'analyze_image',
         hasSource: Boolean(source),
         hasSessionId: Boolean(session_id),
+        callId,
       });
       return {
         content: [

@@ -1,6 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 
 import { getConfig } from './config.js';
+import { errorDetailForLog, textForLog, writeCallLog } from './callLogger.js';
 import { ApiError, CacheError, formatError } from './errors.js';
 import { logger } from './logger.js';
 
@@ -8,6 +9,7 @@ export interface ErrorDiagnosticContext {
   tool: string;
   hasSource: boolean;
   hasSessionId: boolean;
+  callId?: string;
 }
 
 const SKIPPED_NO_MODEL = 'Skipped because ANTHROPIC_MODEL / diagnostics.model is not configured.';
@@ -147,6 +149,8 @@ export async function anthropicDiagnose(
     return SKIPPED_NO_MODEL;
   }
 
+  const startedAt = Date.now();
+  const prompt = buildDiagnosticPrompt(error, localDiagnosis, context);
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), config.diagnostics.timeoutMs);
 
@@ -154,8 +158,23 @@ export async function anthropicDiagnose(
     const client = new Anthropic({
       apiKey: config.api.authToken,
       baseURL: config.api.baseUrl,
-      fetch: globalThis.fetch as never,
-      httpAgent: false as never,
+    });
+    await writeCallLog({
+      event: 'api.diagnostics.request',
+      callId: context.callId,
+      status: 'start',
+      data: {
+        ...diagnosticConfigForLog(config),
+        context: {
+          tool: context.tool,
+          hasSource: context.hasSource,
+          hasSessionId: context.hasSessionId,
+        },
+        originalError: formatError(error),
+        errorDetail: errorDetailForLog(error),
+        localDiagnosis: textForLog(localDiagnosis),
+        prompt: textForLog(prompt),
+      },
     });
     const response = await client.messages.create(
       {
@@ -164,22 +183,57 @@ export async function anthropicDiagnose(
         messages: [
           {
             role: 'user',
-            content: buildDiagnosticPrompt(error, localDiagnosis, context),
+            content: prompt,
           },
         ],
       },
       { signal: controller.signal } as object,
     );
 
-    return extractText(response) || SKIPPED_FAILED;
+    const text = extractText(response) || SKIPPED_FAILED;
+    await writeCallLog({
+      event: 'api.diagnostics.response',
+      callId: context.callId,
+      durationMs: Date.now() - startedAt,
+      status: 'success',
+      data: {
+        model: config.diagnostics.model,
+        result: textForLog(text),
+        textLength: text.length,
+      },
+    });
+    return text;
   } catch (diagnosticError) {
     logger.warn('diagnostics', 'model-assisted diagnosis failed', {
       error: sanitizeForPrompt(diagnosticError),
+    });
+    await writeCallLog({
+      event: 'api.diagnostics.error',
+      callId: context.callId,
+      durationMs: Date.now() - startedAt,
+      status: 'error',
+      data: {
+        ...diagnosticConfigForLog(config),
+        error: formatError(diagnosticError),
+        errorDetail: errorDetailForLog(diagnosticError),
+      },
     });
     return SKIPPED_FAILED;
   } finally {
     clearTimeout(timeout);
   }
+}
+
+function diagnosticConfigForLog(config: ReturnType<typeof getConfig>): Record<string, unknown> {
+  return {
+    baseUrl: config.api.baseUrl || 'sdk-default',
+    authToken: config.api.authToken ? '********' : '',
+    authTokenConfigured: Boolean(config.api.authToken),
+    authTokenSource: config.api.authTokenSource,
+    model: config.diagnostics.model,
+    maxTokens: config.diagnostics.maxTokens,
+    timeoutMs: config.diagnostics.timeoutMs,
+  };
 }
 
 function buildDiagnosticPrompt(

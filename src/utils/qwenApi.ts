@@ -39,8 +39,8 @@ async function startSession(
   prompt: string,
   callId?: string,
 ): Promise<{ result: string; session_id: string }> {
-  const images = await Promise.all(sources.map(readImageSource));
-  const sessionId = await createSession(images, prompt);
+  const images = await Promise.all(sources.map((source) => readImageSource(source, callId)));
+  const sessionId = await createSession(images, prompt, callId);
   const userMessage: StoredMessageParam = {
     role: 'user',
     content: [
@@ -57,7 +57,7 @@ async function startSession(
     { role: 'assistant', content: result },
   ];
 
-  await withLock(sessionId, async () => updateHistory(sessionId, nextMessages));
+  await withLock(sessionId, async () => updateHistory(sessionId, nextMessages, callId));
   return { result, session_id: sessionId };
 }
 
@@ -66,7 +66,7 @@ async function continueSession(
   prompt: string,
   callId?: string,
 ): Promise<{ result: string; session_id: string }> {
-  const session = await readSession(sessionId);
+  const session = await readSession(sessionId, callId);
   if (!session) {
     throw new ApiError('SESSION_NOT_FOUND', `Session not found: ${sessionId}`);
   }
@@ -83,7 +83,7 @@ async function continueSession(
     { role: 'assistant', content: result },
   ];
 
-  await withLock(sessionId, async () => updateHistory(sessionId, nextMessages));
+  await withLock(sessionId, async () => updateHistory(sessionId, nextMessages, callId));
   return { result, session_id: sessionId };
 }
 
@@ -118,8 +118,6 @@ async function callVisionApi(
   const client = new Anthropic({
     apiKey,
     baseURL: config.api.baseUrl,
-    fetch: globalThis.fetch as never,
-    httpAgent: false as never,
   });
   const model = config.api.model;
 

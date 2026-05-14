@@ -176,11 +176,25 @@ Build the single-file release bundle:
 bun run build:bundle
 ```
 
+Build a non-minified bundle for runtime debugging:
+
+```bash
+bun run build:bundle:debug
+```
+
 Create a release zip:
 
 ```bash
 bun run package
 ```
+
+Create a release zip from the non-minified debug bundle:
+
+```bash
+bun run package:debug
+```
+
+The default release commands use minification. Use the debug commands when investigating bundle or runtime issues.
 
 The production entrypoint is:
 

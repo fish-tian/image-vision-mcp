@@ -1,4 +1,6 @@
 import { afterEach, beforeEach, describe, expect, mock, test } from 'bun:test';
+import { readdir, readFile } from 'node:fs/promises';
+import { join } from 'node:path';
 
 import { resetConfigForTests } from '../src/utils/config.js';
 import { ApiError } from '../src/utils/errors.js';
@@ -20,10 +22,12 @@ const { buildErrorResponse } = await import('../src/utils/errorDiagnostics.js');
 
 let env: Record<string, string | undefined>;
 let tempConfigPath: string;
+let logDir: string;
 
 beforeEach(() => {
   env = snapshotEnv();
   tempConfigPath = testTempPath('config.json');
+  logDir = testTempPath('call-logs');
   process.env.IMAGE_VISION_CONFIG = tempConfigPath;
   process.env.LOG_LEVEL = 'error';
   createMock = mock(async () => ({
@@ -35,6 +39,7 @@ beforeEach(() => {
 afterEach(async () => {
   restoreEnv(env);
   await cleanupPath(tempConfigPath);
+  await cleanupPath(logDir);
 });
 
 describe('error diagnostics', () => {
@@ -79,23 +84,51 @@ describe('error diagnostics', () => {
         model: 'diagnostic-model',
         maxTokens: 123,
       },
+      log: {
+        call: {
+          enabled: true,
+          dir: logDir,
+          includeText: true,
+        },
+      },
     });
     resetConfigForTests();
 
     const text = await buildErrorResponse(
       new ApiError('API_REQUEST_FAILED', 'Image analysis API request failed'),
-      { tool: 'analyze_image', hasSource: true, hasSessionId: false },
+      { tool: 'analyze_image', hasSource: true, hasSessionId: false, callId: 'call_diagnostics' },
     );
 
     expect(createMock).toHaveBeenCalledTimes(1);
     expect(createMock.mock.calls[0][0].model).toBe('diagnostic-model');
     expect(createMock.mock.calls[0][0].max_tokens).toBe(123);
     expect(text).toContain('- Model cause: mocked diagnostic.');
+
+    const entries = await readLogEntries();
+    const request = entries.find((entry) => entry.event === 'api.diagnostics.request');
+    const response = entries.find((entry) => entry.event === 'api.diagnostics.response');
+    expect(request?.callId).toBe('call_diagnostics');
+    expect(request?.data.model).toBe('diagnostic-model');
+    expect(request?.data.maxTokens).toBe(123);
+    expect(request?.data.authToken).toBe('********');
+    expect(request?.data.context).toEqual({ tool: 'analyze_image', hasSource: true, hasSessionId: false });
+    expect(request?.data.originalError).toContain('API_REQUEST_FAILED');
+    expect(request?.data.localDiagnosis).toContain('The upstream model API request failed');
+    expect(response?.callId).toBe('call_diagnostics');
+    expect(response?.data.result).toContain('mocked diagnostic');
+    expect(response?.data.textLength).toBe('- Model cause: mocked diagnostic.\n- Model fix: mocked fix.'.length);
   });
 
   test('model-assisted diagnosis failure keeps original error and local diagnosis', async () => {
     createMock = mock(async () => {
-      throw new Error('diagnostic failed');
+      throw Object.assign(new Error('diagnostic failed'), {
+        headers: {
+          authorization: 'Bearer test-token',
+        },
+        body: {
+          apiKey: 'test-token',
+        },
+      });
     });
     await writeJson(tempConfigPath, {
       api: {
@@ -104,16 +137,70 @@ describe('error diagnostics', () => {
       diagnostics: {
         model: 'diagnostic-model',
       },
+      log: {
+        call: {
+          enabled: true,
+          dir: logDir,
+        },
+      },
     });
     resetConfigForTests();
 
     const text = await buildErrorResponse(
       new ApiError('IMAGE_READ_FAILED', 'Failed to read image source: missing.png'),
-      { tool: 'analyze_image', hasSource: true, hasSessionId: false },
+      { tool: 'analyze_image', hasSource: true, hasSessionId: false, callId: 'call_diagnostics_error' },
     );
 
     expect(text).toContain('[ApiError:IMAGE_READ_FAILED]');
     expect(text).toContain('The image could not be read');
     expect(text).toContain('Model-assisted diagnosis was skipped or failed.');
+
+    const entries = await readLogEntries();
+    const error = entries.find((entry) => entry.event === 'api.diagnostics.error');
+    expect(error?.callId).toBe('call_diagnostics_error');
+    expect(error?.status).toBe('error');
+    expect(error?.data.errorDetail.headers.authorization).toBe('********');
+    expect(error?.data.errorDetail.body.apiKey).toBe('********');
+    expect(JSON.stringify(error)).not.toContain('test-token');
+  });
+
+  test('diagnostic call logs summarize text when includeText is false', async () => {
+    await writeJson(tempConfigPath, {
+      api: {
+        authToken: 'test-token',
+      },
+      diagnostics: {
+        model: 'diagnostic-model',
+      },
+      log: {
+        call: {
+          enabled: true,
+          dir: logDir,
+          includeText: false,
+        },
+      },
+    });
+    resetConfigForTests();
+
+    await buildErrorResponse(
+      new ApiError('API_REQUEST_FAILED', 'Image analysis API request failed'),
+      { tool: 'analyze_image', hasSource: true, hasSessionId: false, callId: 'call_text_summary' },
+    );
+
+    const entries = await readLogEntries();
+    const request = entries.find((entry) => entry.event === 'api.diagnostics.request');
+    const response = entries.find((entry) => entry.event === 'api.diagnostics.response');
+    expect(request?.data.localDiagnosis.length).toBeGreaterThan(0);
+    expect(request?.data.localDiagnosis.sha256).toHaveLength(64);
+    expect(request?.data.prompt.sha256).toHaveLength(64);
+    expect(response?.data.result.sha256).toHaveLength(64);
+    expect(JSON.stringify(request)).not.toContain('The upstream model API request failed');
+    expect(JSON.stringify(response)).not.toContain('mocked diagnostic');
   });
 });
+
+async function readLogEntries(): Promise<Array<Record<string, any>>> {
+  const files = await readdir(logDir);
+  const text = await readFile(join(logDir, files[0]), 'utf8');
+  return text.trim().split('\n').map((line) => JSON.parse(line));
+}

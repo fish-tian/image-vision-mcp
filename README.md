@@ -214,6 +214,8 @@ node dist/index.js
 
 ### `analyze_image`
 
+Claude Code should call this tool directly with the original image source from the user message. If the user provides an `@path` mention, repository path, Windows path, or HTTP image URL, pass that exact value as `source`. Do not first read the image with a host `Read` tool, and do not pass temporary upload/proxy URLs such as paths containing `/data-uri/null/`.
+
 Parameters:
 
 | Name | Type | Required | Description |
@@ -228,6 +230,15 @@ First call example:
 {
   "source": "C:\\Users\\you\\Pictures\\example.png",
   "prompt": "Describe this image in detail."
+}
+```
+
+Repository path example:
+
+```json
+{
+  "source": "src\\views\\Chat\\ui稿.png",
+  "prompt": "Analyze this UI mockup and describe the layout, visible text, controls, colors, and code changes needed."
 }
 ```
 

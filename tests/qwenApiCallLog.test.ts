@@ -6,16 +6,32 @@ import { initCache } from '../src/utils/cache.js';
 import { resetConfigForTests } from '../src/utils/config.js';
 import { cleanupPath, restoreEnv, snapshotEnv, testTempPath, writeBinary, writeJson } from './helpers/env.js';
 
+let createMock = mock(() => Promise.resolve({
+  content: [
+    { type: 'text', text: 'mocked result' },
+  ],
+  stop_reason: 'end_turn',
+  usage: {
+    input_tokens: 10,
+    output_tokens: 2,
+  },
+}));
 let streamMock = mock(() => ({
   async *[Symbol.asyncIterator]() {
-    yield { type: 'content_block_delta', delta: { type: 'text_delta', text: 'mocked ' } };
+    yield { type: 'content_block_delta', delta: { type: 'text_delta', text: 'streamed ' } };
     yield { type: 'content_block_delta', delta: { type: 'text_delta', text: 'result' } };
+    yield {
+      type: 'message_delta',
+      delta: { stop_reason: 'end_turn' },
+      usage: { output_tokens: 2 },
+    };
   },
 }));
 
 mock.module('@anthropic-ai/sdk', () => ({
   default: class AnthropicMock {
     messages = {
+      create: createMock,
       stream: streamMock,
     };
   },
@@ -37,10 +53,25 @@ beforeEach(async () => {
   imagePath = testTempPath('image.png');
   process.env.IMAGE_VISION_CONFIG = tempConfigPath;
   process.env.LOG_LEVEL = 'error';
+  createMock = mock(() => Promise.resolve({
+    content: [
+      { type: 'text', text: 'mocked result' },
+    ],
+    stop_reason: 'end_turn',
+    usage: {
+      input_tokens: 10,
+      output_tokens: 2,
+    },
+  }));
   streamMock = mock(() => ({
     async *[Symbol.asyncIterator]() {
-      yield { type: 'content_block_delta', delta: { type: 'text_delta', text: 'mocked ' } };
+      yield { type: 'content_block_delta', delta: { type: 'text_delta', text: 'streamed ' } };
       yield { type: 'content_block_delta', delta: { type: 'text_delta', text: 'result' } };
+      yield {
+        type: 'message_delta',
+        delta: { stop_reason: 'end_turn' },
+        usage: { output_tokens: 2 },
+      };
     },
   }));
   await writeBinary(imagePath, new Uint8Array([137, 80, 78, 71]));
@@ -80,7 +111,7 @@ describe('qwen API call logging', () => {
     const result = await analyzeImage([imagePath], null, 'describe token=plain', 'call_test');
 
     expect(result.result).toBe('mocked result');
-    expect(streamMock).toHaveBeenCalledTimes(1);
+    expect(createMock).toHaveBeenCalledTimes(1);
 
     const entries = await readLogEntries();
     const request = entries.find((entry) => entry.event === 'api.vision.request');
@@ -98,7 +129,73 @@ describe('qwen API call logging', () => {
     expect(JSON.stringify(request)).not.toContain('test-token');
     expect(JSON.stringify(request)).not.toContain(Buffer.from(new Uint8Array([137, 80, 78, 71])).toString('base64'));
     expect(response?.data.result).toBe('mocked result');
+    expect(response?.data.apiMode).toBe('non-streaming');
+    expect(response?.data.stopReason).toBe('end_turn');
+    expect(response?.data.usage).toEqual({ input_tokens: 10, output_tokens: 2 });
     expect(response?.data.textLength).toBe('mocked result'.length);
+  });
+
+  test('joins all non-streaming response text blocks', async () => {
+    createMock = mock(() => Promise.resolve({
+      content: [
+        { type: 'text', text: 'first part' },
+        { type: 'text', text: 'second part' },
+      ],
+      stop_reason: 'end_turn',
+      usage: {
+        input_tokens: 10,
+        output_tokens: 4,
+      },
+    }));
+    await writeJson(tempConfigPath, {
+      api: {
+        authToken: 'test-token',
+        model: 'test-model',
+      },
+      cache: {
+        dir: cacheDir,
+      },
+    });
+    resetConfigForTests();
+    await initCache();
+
+    const result = await analyzeImage([imagePath], null, 'describe', 'call_text_blocks');
+
+    expect(result.result).toBe('first part\nsecond part');
+  });
+
+  test('falls back to streaming when SDK requires it for large max_tokens', async () => {
+    createMock = mock(() => {
+      throw new Error('Streaming is required for operations that may take longer than 10 minutes.');
+    });
+    await writeJson(tempConfigPath, {
+      api: {
+        authToken: 'test-token',
+        model: 'test-model',
+        maxTokens: 64_000,
+      },
+      cache: {
+        dir: cacheDir,
+      },
+      log: {
+        call: {
+          enabled: true,
+          dir: logDir,
+        },
+      },
+    });
+    resetConfigForTests();
+    await initCache();
+
+    const result = await analyzeImage([imagePath], null, 'describe', 'call_stream_fallback');
+
+    expect(result.result).toBe('streamed result');
+    expect(createMock).toHaveBeenCalledTimes(1);
+    expect(streamMock).toHaveBeenCalledTimes(1);
+    const entries = await readLogEntries();
+    const response = entries.find((entry) => entry.event === 'api.vision.response');
+    expect(response?.data.apiMode).toBe('streaming');
+    expect(response?.data.fallbackReason).toBe('sdk-requires-streaming-for-large-max-tokens');
   });
 
   test('writes API error call log when token is missing', async () => {
@@ -133,7 +230,7 @@ describe('qwen API call logging', () => {
   });
 
   test('writes SDK error details and masks sensitive fields', async () => {
-    streamMock = mock(() => {
+    createMock = mock(() => {
       throw Object.assign(new Error('upstream rejected request'), {
         status: 401,
         code: 'unauthorized',

@@ -78,6 +78,21 @@ claude mcp get image-vision
 
 Start a new Claude Code session and use the `analyze_image` tool. On success, the visible tool text contains only the upstream model response; use `structuredContent.session_id` for follow-up calls.
 
+## Calling Rule For Claude Code
+
+When the user provides an image path or URL, call `analyze_image` directly with that original value as `source`.
+
+Correct:
+
+```json
+{
+  "source": "src\\views\\Chat\\ui稿.png",
+  "prompt": "Analyze this UI mockup in detail."
+}
+```
+
+Do not first read the image with a host `Read` tool. Do not pass temporary upload/proxy URLs, generated `data-uri/null` URLs, or guessed URLs as `source`; those are not the user-provided image source.
+
 ## Update Configuration
 
 Create or edit:

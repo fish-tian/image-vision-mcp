@@ -1,6 +1,6 @@
 import { createCallId, summarizeToolInput, textForLog, writeCallLog } from './utils/callLogger.js';
 import { buildErrorResponse } from './utils/errorDiagnostics.js';
-import { formatError } from './utils/errors.js';
+import { ApiError, formatError } from './utils/errors.js';
 import { logger } from './utils/logger.js';
 import { analyzeImage } from './utils/qwenApi.js';
 
@@ -27,6 +27,7 @@ export function createAnalyzeImageHandler(analyzeImageFn: AnalyzeImageFn = analy
     });
 
     try {
+      assertUsableSources(sources);
       const { result, session_id: returnedId } = await analyzeImageFn(
         sources,
         session_id ?? null,
@@ -89,4 +90,28 @@ export function createAnalyzeImageHandler(analyzeImageFn: AnalyzeImageFn = analy
       };
     }
   };
+}
+
+function assertUsableSources(sources: string[] | null): void {
+  for (const source of sources ?? []) {
+    if (isTemporaryImageProxyUrl(source)) {
+      throw new ApiError(
+        'IMAGE_READ_FAILED',
+        [
+          'The provided source looks like a temporary image proxy URL, not the original user image source.',
+          'Call analyze_image with the original local file path or original image URL from the user message.',
+          'Do not first read the image with a host Read tool and do not pass generated data-uri/null proxy URLs as source.',
+        ].join(' '),
+      );
+    }
+  }
+}
+
+function isTemporaryImageProxyUrl(source: string): boolean {
+  try {
+    const url = new URL(source);
+    return url.pathname.includes('/data-uri/null/');
+  } catch {
+    return source.includes('/data-uri/null/') || source.includes('\\data-uri\\null\\');
+  }
 }

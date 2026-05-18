@@ -136,20 +136,13 @@ async function callVisionApi(
         ...summarizeApiMessages(messages),
       },
     });
-    const stream = client.messages.stream({
+    const response = await callVisionApiWithFallback(client, {
       model,
       max_tokens: config.api.maxTokens,
       messages,
     });
-    let text = '';
 
-    for await (const event of stream) {
-      if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
-        text += event.delta.text;
-      }
-    }
-
-    logger.info('api', 'received image analysis', { model, textLength: text.length });
+    logger.info('api', 'received image analysis', { model, textLength: response.text.length });
     await writeCallLog({
       event: 'api.vision.response',
       callId,
@@ -158,11 +151,15 @@ async function callVisionApi(
       status: 'success',
       data: {
         model,
-        result: textForLog(text),
-        textLength: text.length,
+        apiMode: response.apiMode,
+        fallbackReason: response.fallbackReason,
+        stopReason: response.stop_reason,
+        usage: response.usage,
+        result: textForLog(response.text),
+        textLength: response.text.length,
       },
     });
-    return text;
+    return response.text;
   } catch (error) {
     if (error instanceof CacheError || error instanceof ApiError) {
       await writeCallLog({
@@ -206,4 +203,75 @@ function apiConfigForLog(config: ImageVisionConfig): Record<string, unknown> {
     model: config.api.model,
     maxTokens: config.api.maxTokens,
   };
+}
+
+interface VisionApiResponse {
+  text: string;
+  apiMode: 'non-streaming' | 'streaming';
+  fallbackReason?: string;
+  stop_reason?: Anthropic.Messages.Message['stop_reason'];
+  usage?: unknown;
+}
+
+async function callVisionApiWithFallback(
+  client: Anthropic,
+  params: Anthropic.Messages.MessageCreateParamsNonStreaming,
+): Promise<VisionApiResponse> {
+  try {
+    const response = await client.messages.create(params);
+    return {
+      text: extractText(response),
+      apiMode: 'non-streaming',
+      stop_reason: response.stop_reason,
+      usage: response.usage,
+    };
+  } catch (error) {
+    if (!isStreamingRequiredError(error)) {
+      throw error;
+    }
+
+    const response = await callVisionApiStreaming(client, params);
+    return {
+      ...response,
+      fallbackReason: 'sdk-requires-streaming-for-large-max-tokens',
+    };
+  }
+}
+
+async function callVisionApiStreaming(
+  client: Anthropic,
+  params: Anthropic.Messages.MessageCreateParamsNonStreaming,
+): Promise<VisionApiResponse> {
+  const stream = client.messages.stream(params);
+  let text = '';
+  let stopReason: Anthropic.Messages.Message['stop_reason'] | undefined;
+  let usage: Record<string, unknown> | undefined;
+
+  for await (const event of stream) {
+    if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
+      text += event.delta.text;
+    } else if (event.type === 'message_delta') {
+      stopReason = event.delta.stop_reason ?? stopReason;
+      usage = event.usage ? { ...usage, ...event.usage } : usage;
+    }
+  }
+
+  return {
+    text: text.trim(),
+    apiMode: 'streaming',
+    stop_reason: stopReason,
+    usage,
+  };
+}
+
+function extractText(response: Anthropic.Messages.Message): string {
+  return response.content
+    .map((block) => (block.type === 'text' ? block.text : ''))
+    .filter(Boolean)
+    .join('\n')
+    .trim();
+}
+
+function isStreamingRequiredError(error: unknown): boolean {
+  return error instanceof Error && error.message.includes('Streaming is required');
 }

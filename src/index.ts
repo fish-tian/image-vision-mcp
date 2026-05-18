@@ -10,7 +10,16 @@ import { logger } from './utils/logger.js';
 import { createAnalyzeImageHandler } from './analyzeImageTool.js';
 
 const analyzeImageInputSchema = {
-  source: z.union([z.string(), z.array(z.string())]).optional(),
+  source: z
+    .union([z.string(), z.array(z.string())])
+    .optional()
+    .describe(
+      [
+        'Original user-provided local image path or original image URL.',
+        'Pass paths such as @src/views/Chat/ui稿.png or C:\\path\\image.png directly.',
+        'Do not use host Read output, uploaded-image proxy URLs, data-uri/null URLs, or guessed URLs.',
+      ].join(' '),
+    ),
   session_id: z.string().optional(),
   prompt: z.string().optional(),
 };
@@ -31,7 +40,10 @@ export function createServer(): McpServer {
     {
       title: 'Analyze image',
       description: [
-        'Analyze one or more images, then continue follow-up questions with session_id.',
+        'Analyze one or more images by directly reading the original source path or URL.',
+        'When the user provides an image path, @path mention, Windows path, repository path, or image URL, pass that exact original value as source.',
+        'Do not call a host Read tool first and do not pass generated temporary URLs, upload proxy URLs, data-uri/null URLs, or guessed URLs.',
+        'Continue follow-up questions with session_id.',
         'On success, present content[0].text exactly as returned by the upstream vision model.',
         'Do not summarize, translate, rewrite, reformat, add headings, or append session_id.',
         'Use structuredContent.session_id only for follow-up tool calls.',
@@ -40,7 +52,7 @@ export function createServer(): McpServer {
       outputSchema: analyzeImageOutputSchema,
       annotations: {
         title: 'Analyze image',
-        readOnlyHint: false,
+        readOnlyHint: true,
         destructiveHint: false,
         idempotentHint: false,
         openWorldHint: true,
@@ -48,6 +60,7 @@ export function createServer(): McpServer {
       _meta: {
         'image-vision/visible-text': 'verbatim-upstream-result',
         'image-vision/session-id-field': 'structuredContent.session_id',
+        'image-vision/source-policy': 'use-original-user-path-or-url',
       },
     },
     createAnalyzeImageHandler(),

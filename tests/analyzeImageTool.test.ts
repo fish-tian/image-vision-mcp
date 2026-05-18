@@ -73,4 +73,22 @@ describe('analyze_image tool response', () => {
       expect.stringMatching(/^call_/),
     );
   });
+
+  test('rejects temporary image proxy URLs before calling upstream analysis', async () => {
+    const analyzeImageMock = mock(async () => ({
+      result: 'should not be called',
+      session_id: 'img_test_session',
+    }));
+    const handler = createAnalyzeImageHandler(analyzeImageMock);
+
+    const response = await handler({
+      source: 'http://ds-restful-api-bj-prod.oss-cn-beijing.aliyuncs.com/restful/data-uri/null/abc?Expires=1',
+      prompt: 'describe it',
+    });
+
+    expect(response.isError).toBe(true);
+    expect(response.content[0].text).toContain('temporary image proxy URL');
+    expect(response.content[0].text).toContain('original local file path or original image URL');
+    expect(analyzeImageMock).not.toHaveBeenCalled();
+  });
 });

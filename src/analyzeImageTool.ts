@@ -10,16 +10,30 @@ export interface AnalyzeImageArgs {
   source?: string | string[];
   session_id?: string;
   prompt?: string;
+  output_type?: 'code' | 'prompt' | 'spec' | 'description';
 }
 
-export function createAnalyzeImageHandler(analyzeImageFn: AnalyzeImageFn = analyzeImage) {
-  return async ({ source, session_id, prompt }: AnalyzeImageArgs) => {
+export interface VisionToolOptions {
+  toolName?: string;
+  defaultPrompt?: string | ((args: AnalyzeImageArgs) => string);
+  validateSources?: (sources: string[] | null, args: AnalyzeImageArgs) => void;
+}
+
+export function createAnalyzeImageHandler(
+  analyzeImageFn: AnalyzeImageFn = analyzeImage,
+  options: VisionToolOptions = {},
+) {
+  const toolName = options.toolName ?? 'analyze_image';
+
+  return async (args: AnalyzeImageArgs) => {
+    const { source, session_id } = args;
     const callId = createCallId();
     const startedAt = Date.now();
     const sources = typeof source === 'string' ? [source] : source ?? null;
+    const prompt = buildEffectivePrompt(args, options.defaultPrompt);
 
     await writeCallLog({
-      event: 'tool.analyze_image.start',
+      event: `tool.${toolName}.start`,
       callId,
       sessionId: session_id ?? null,
       status: 'start',
@@ -28,6 +42,7 @@ export function createAnalyzeImageHandler(analyzeImageFn: AnalyzeImageFn = analy
 
     try {
       assertUsableSources(sources);
+      options.validateSources?.(sources, args);
       const { result, session_id: returnedId } = await analyzeImageFn(
         sources,
         session_id ?? null,
@@ -36,7 +51,7 @@ export function createAnalyzeImageHandler(analyzeImageFn: AnalyzeImageFn = analy
       );
 
       await writeCallLog({
-        event: 'tool.analyze_image.success',
+        event: `tool.${toolName}.success`,
         callId,
         sessionId: returnedId,
         durationMs: Date.now() - startedAt,
@@ -66,7 +81,7 @@ export function createAnalyzeImageHandler(analyzeImageFn: AnalyzeImageFn = analy
     } catch (error) {
       logger.error('server', 'tool call failed', { error: formatError(error) });
       await writeCallLog({
-        event: 'tool.analyze_image.error',
+        event: `tool.${toolName}.error`,
         callId,
         sessionId: session_id ?? null,
         durationMs: Date.now() - startedAt,
@@ -74,7 +89,7 @@ export function createAnalyzeImageHandler(analyzeImageFn: AnalyzeImageFn = analy
         data: { error: formatError(error) },
       });
       const text = await buildErrorResponse(error, {
-        tool: 'analyze_image',
+        tool: toolName,
         hasSource: Boolean(source),
         hasSessionId: Boolean(session_id),
         callId,
@@ -92,6 +107,22 @@ export function createAnalyzeImageHandler(analyzeImageFn: AnalyzeImageFn = analy
   };
 }
 
+function buildEffectivePrompt(
+  args: AnalyzeImageArgs,
+  defaultPrompt: VisionToolOptions['defaultPrompt'],
+): string | undefined {
+  const base = typeof defaultPrompt === 'function' ? defaultPrompt(args) : defaultPrompt;
+  if (!base) {
+    return args.prompt;
+  }
+
+  if (!args.prompt?.trim()) {
+    return base;
+  }
+
+  return `${base}\n\nAdditional user instructions:\n${args.prompt}`;
+}
+
 function assertUsableSources(sources: string[] | null): void {
   for (const source of sources ?? []) {
     if (isTemporaryImageProxyUrl(source)) {
@@ -99,7 +130,7 @@ function assertUsableSources(sources: string[] | null): void {
         'IMAGE_READ_FAILED',
         [
           'The provided source looks like a temporary image proxy URL, not the original user image source.',
-          'Call analyze_image with the original local file path or original image URL from the user message.',
+          'Call the image vision tool with the original local file path or original image URL from the user message.',
           'Do not first read the image with a host Read tool and do not pass generated data-uri/null proxy URLs as source.',
         ].join(' '),
       );

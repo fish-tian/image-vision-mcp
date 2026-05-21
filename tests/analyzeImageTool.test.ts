@@ -91,4 +91,74 @@ describe('analyze_image tool response', () => {
     expect(response.content[0].text).toContain('original local file path or original image URL');
     expect(analyzeImageMock).not.toHaveBeenCalled();
   });
+
+  test('injects a specialized default prompt and keeps user instructions', async () => {
+    const analyzeImageMock = mock(async () => ({
+      result: 'ocr result',
+      session_id: 'img_ocr_session',
+    }));
+    const handler = createAnalyzeImageHandler(analyzeImageMock, {
+      toolName: 'extract_text_from_screenshot',
+      defaultPrompt: 'Extract all visible text.',
+    });
+
+    const response = await handler({
+      source: 'screenshot.png',
+      prompt: 'Preserve table columns.',
+    });
+
+    expect(response.content[0].text).toBe('ocr result');
+    expect(analyzeImageMock).toHaveBeenCalledWith(
+      ['screenshot.png'],
+      null,
+      'Extract all visible text.\n\nAdditional user instructions:\nPreserve table columns.',
+      expect.stringMatching(/^call_/),
+    );
+  });
+
+  test('supports default prompt builders with output_type', async () => {
+    const analyzeImageMock = mock(async () => ({
+      result: 'artifact result',
+      session_id: 'img_artifact_session',
+    }));
+    const handler = createAnalyzeImageHandler(analyzeImageMock, {
+      toolName: 'ui_to_artifact',
+      defaultPrompt: ({ output_type }) => `Convert UI to ${output_type || 'description'}.`,
+    });
+
+    await handler({
+      source: 'ui.png',
+      output_type: 'spec',
+    });
+
+    expect(analyzeImageMock).toHaveBeenCalledWith(
+      ['ui.png'],
+      null,
+      'Convert UI to spec.',
+      expect.stringMatching(/^call_/),
+    );
+  });
+
+  test('runs specialized source validation before upstream analysis', async () => {
+    const analyzeImageMock = mock(async () => ({
+      result: 'should not be called',
+      session_id: 'img_diff_session',
+    }));
+    const handler = createAnalyzeImageHandler(analyzeImageMock, {
+      toolName: 'ui_diff_check',
+      validateSources: (sources) => {
+        if (!sources || sources.length !== 2) {
+          throw new Error('ui_diff_check requires exactly two images');
+        }
+      },
+    });
+
+    const response = await handler({
+      source: 'only-one.png',
+    });
+
+    expect(response.isError).toBe(true);
+    expect(response.content[0].text).toContain('ui_diff_check requires exactly two images');
+    expect(analyzeImageMock).not.toHaveBeenCalled();
+  });
 });

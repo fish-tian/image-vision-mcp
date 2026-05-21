@@ -76,11 +76,21 @@ If the Claude Code process can see `ANTHROPIC_AUTH_TOKEN`, `ANTHROPIC_BASE_URL`,
 claude mcp get image-vision
 ```
 
-Start a new Claude Code session and use the `analyze_image` tool. On success, the visible tool text contains only the upstream model response; use `structuredContent.session_id` for follow-up calls.
+Start a new Claude Code session and use one of the image vision tools. The original `analyze_image` tool remains available, and specialized tools include `image_analysis`, `extract_text_from_screenshot`, `diagnose_error_screenshot`, `understand_technical_diagram`, `analyze_data_visualization`, `ui_to_artifact`, and `ui_diff_check`. Video analysis is not supported yet. On success, the visible tool text contains only the upstream model response; use `structuredContent.session_id` for follow-up calls.
 
 ## Calling Rule For Claude Code
 
-When the user provides an image path or URL, call `analyze_image` directly with that original value as `source`.
+When the user provides an image path or URL, call the most specific image vision tool directly with that original value as `source`.
+
+Use:
+
+- `extract_text_from_screenshot` for OCR.
+- `diagnose_error_screenshot` for error screenshots.
+- `understand_technical_diagram` for architecture, flow, UML, ER, and system diagrams.
+- `analyze_data_visualization` for charts and dashboards.
+- `ui_to_artifact` for converting UI screenshots to `code`, `prompt`, `spec`, or `description` artifacts.
+- `ui_diff_check` for exactly two UI screenshots.
+- `image_analysis` or `analyze_image` for general image analysis.
 
 Correct:
 
@@ -88,6 +98,26 @@ Correct:
 {
   "source": "src\\views\\Chat\\ui稿.png",
   "prompt": "Analyze this UI mockup in detail."
+}
+```
+
+UI artifact example:
+
+```json
+{
+  "source": "src\\views\\Chat\\mockup.png",
+  "output_type": "spec"
+}
+```
+
+UI diff example:
+
+```json
+{
+  "source": [
+    "src\\views\\Chat\\expected.png",
+    "src\\views\\Chat\\actual.png"
+  ]
 }
 ```
 

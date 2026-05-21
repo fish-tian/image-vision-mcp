@@ -2,12 +2,13 @@
 
 [中文](./README.zh-CN.md)
 
-An MCP server that exposes image analysis through a single `analyze_image` tool. It supports first-pass analysis for one or more images, then follow-up questions through a cached `session_id`.
+An MCP server that exposes image analysis tools for general image understanding, OCR, UI analysis, error screenshots, technical diagrams, chart analysis, and UI diff checks. It supports first-pass analysis for one or more images, then follow-up questions through a cached `session_id`.
 
 ## Features
 
 - Analyze local image files or remote image URLs.
 - Analyze multiple images in one request.
+- Use specialized tools for OCR, error screenshots, technical diagrams, data visualizations, UI-to-artifact conversion, and UI diff checks.
 - Continue follow-up questions with `session_id`.
 - Stores image blobs separately from conversation history to avoid rewriting large base64 payloads.
 - Expires sessions after 24 hours.
@@ -214,9 +215,11 @@ node dist/index.js
 
 ## MCP Tool
 
-### `analyze_image`
+The server keeps the original `analyze_image` tool and also exposes Z.AI-style specialized image tools. Video analysis is intentionally not supported yet.
 
-Claude Code should call this tool directly with the original image source from the user message. If the user provides an `@path` mention, repository path, Windows path, or HTTP image URL, pass that exact value as `source`. Do not first read the image with a host `Read` tool, and do not pass temporary upload/proxy URLs such as paths containing `/data-uri/null/`.
+### Shared Calling Rules
+
+Claude Code should call these tools directly with the original image source from the user message. If the user provides an `@path` mention, repository path, Windows path, or HTTP image URL, pass that exact value as `source`. Do not first read the image with a host `Read` tool, and do not pass temporary upload/proxy URLs such as paths containing `/data-uri/null/`.
 
 Parameters:
 
@@ -225,6 +228,22 @@ Parameters:
 | `source` | `string \| string[]` | Required for first call | Local image path or image URL. Supports one or more images. |
 | `session_id` | `string` | Required for follow-up calls | Existing session ID returned from a previous analysis. |
 | `prompt` | `string` | No | Analysis prompt or follow-up question. |
+| `output_type` | `"code" \| "prompt" \| "spec" \| "description"` | No | Only for `ui_to_artifact`; defaults to `description`. |
+
+The visible text returned by each tool contains only the upstream model response. The active `session_id` is returned in `structuredContent.session_id` for follow-up calls.
+
+### Tools
+
+| Tool | Use |
+| --- | --- |
+| `analyze_image` | Original generic image analysis tool; kept for compatibility. |
+| `image_analysis` | General image understanding when no specialized tool fits. |
+| `extract_text_from_screenshot` | OCR screenshots, including code, terminals, documents, and UI text. |
+| `diagnose_error_screenshot` | Explain error screenshots and suggest fixes. |
+| `understand_technical_diagram` | Interpret architecture, flow, UML, ER, and system diagrams. |
+| `analyze_data_visualization` | Read charts and dashboards for trends, values, outliers, and caveats. |
+| `ui_to_artifact` | Convert UI screenshots into code, prompts, specs, or descriptions. |
+| `ui_diff_check` | Compare exactly two UI screenshots for visual or implementation drift. |
 
 First call example:
 
@@ -256,6 +275,36 @@ Multiple images:
 }
 ```
 
+OCR example:
+
+```json
+{
+  "source": "C:\\Users\\you\\Pictures\\terminal-error.png",
+  "prompt": "Keep terminal line breaks intact."
+}
+```
+
+UI artifact example:
+
+```json
+{
+  "source": "C:\\Users\\you\\Pictures\\mockup.png",
+  "output_type": "spec"
+}
+```
+
+UI diff example:
+
+```json
+{
+  "source": [
+    "C:\\Users\\you\\Pictures\\expected.png",
+    "C:\\Users\\you\\Pictures\\actual.png"
+  ],
+  "prompt": "Focus on spacing, typography, and color differences."
+}
+```
+
 Follow-up:
 
 ```json
@@ -264,8 +313,6 @@ Follow-up:
   "prompt": "What text appears in the top-right corner?"
 }
 ```
-
-The visible text returned by the tool contains only the upstream model response. The active `session_id` is returned in `structuredContent.session_id` for follow-up calls.
 
 ## Claude Code Configuration
 

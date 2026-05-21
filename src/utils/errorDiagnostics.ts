@@ -54,8 +54,8 @@ export function localDiagnose(error: unknown): string {
         );
       case 'NO_IMAGE_PROVIDED':
         return bullets(
-          'The first analyze_image call did not include a source image.',
-          'Call analyze_image with source set to a local path or image URL, or use an existing session_id for follow-up.',
+          'The first image vision tool call did not include a source image.',
+          'Call the selected image vision tool with source set to a local path or image URL, or use an existing session_id for follow-up.',
           'Ask the user to provide an image source or a valid session_id.',
         );
       case 'IMAGE_READ_FAILED':

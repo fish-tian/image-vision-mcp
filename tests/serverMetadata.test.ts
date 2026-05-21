@@ -11,4 +11,18 @@ describe('analyze_image tool metadata', () => {
     expect(source).toContain('readOnlyHint: true');
     expect(source).toContain('use-original-user-path-or-url');
   });
+
+  test('registers Z.AI-style image vision tools except video analysis', async () => {
+    const source = await readFile('src/index.ts', 'utf8');
+
+    expect(source).toContain("name: 'image_analysis'");
+    expect(source).toContain("name: 'extract_text_from_screenshot'");
+    expect(source).toContain("name: 'diagnose_error_screenshot'");
+    expect(source).toContain("name: 'understand_technical_diagram'");
+    expect(source).toContain("name: 'analyze_data_visualization'");
+    expect(source).toContain("name: 'ui_to_artifact'");
+    expect(source).toContain("name: 'ui_diff_check'");
+    expect(source).toContain("['code', 'prompt', 'spec', 'description']");
+    expect(source).not.toContain("name: 'video_analysis'");
+  });
 });

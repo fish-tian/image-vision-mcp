@@ -84,6 +84,8 @@ Important distinction:
 
 ## Release Packaging
 
+Before every release, update the root `package.json` `version` first. The release zip filename and the generated release `package.json` both use this version, so skipping the version bump produces a misleading or duplicate release artifact.
+
 The release build command is:
 
 ```bash
@@ -107,7 +109,7 @@ It runs `bun run build:bundle:debug` first, which writes a non-minified `dist/in
 Then `scripts/package-release.ts` creates:
 
 ```text
-release/image-vision-mcp-v1.0.0.zip
+release/image-vision-mcp-vX.Y.Z.zip
 ```
 
 The zip contains:
@@ -127,7 +129,7 @@ The release-specific `package.json` is generated during packaging and contains o
 ```json
 {
   "name": "image-vision-mcp",
-  "version": "1.0.0",
+  "version": "X.Y.Z",
   "type": "module",
   "main": "dist/index.js"
 }

@@ -192,6 +192,8 @@ bun run build:bundle:debug
 
 Create a release zip:
 
+Update the root `package.json` `version` before each release. The release zip filename and bundled release `package.json` are generated from that version.
+
 ```bash
 bun run package
 ```

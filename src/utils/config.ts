@@ -4,6 +4,7 @@ import { isAbsolute, join, normalize } from 'node:path';
 
 export interface ImageVisionConfig {
   api: {
+    provider: 'anthropic' | 'openai';
     authToken: string;
     authTokenSource: 'config' | 'env' | 'missing';
     baseUrl?: string;
@@ -49,6 +50,7 @@ type PartialConfig = {
 const DEFAULT_CONFIG_PATH = '~/.image-vision-mcp/config.json';
 const DEFAULT_CONFIG: Omit<ImageVisionConfig, 'configPath'> = {
   api: {
+    provider: 'anthropic',
     authToken: '',
     authTokenSource: 'missing',
     model: 'openai/qwen3.6-plus',
@@ -139,6 +141,7 @@ function mergeConfig(
     api: {
       ...defaults.api,
       ...fileConfig.api,
+      provider: apiProvider(fileConfig.api?.provider, defaults.api.provider),
       authToken: nonEmptyString(fileConfig.api?.authToken, defaults.api.authToken),
       authTokenSource: defaults.api.authTokenSource,
       baseUrl: optionalNonEmptyString(fileConfig.api?.baseUrl, defaults.api.baseUrl),
@@ -188,6 +191,7 @@ function applyEnvDefaults(config: Omit<ImageVisionConfig, 'configPath'>): Omit<I
     ...config,
     api: {
       ...config.api,
+      provider: apiProvider(process.env.VISION_API_PROVIDER, config.api.provider),
       authToken: process.env.ANTHROPIC_AUTH_TOKEN || config.api.authToken,
       authTokenSource: process.env.ANTHROPIC_AUTH_TOKEN ? 'env' : config.api.authTokenSource,
       baseUrl: process.env.ANTHROPIC_BASE_URL || config.api.baseUrl,
@@ -287,4 +291,8 @@ function logLevel(value: unknown, fallback: ImageVisionConfig['log']['level']): 
   return value === 'debug' || value === 'info' || value === 'warn' || value === 'error'
     ? value
     : fallback;
+}
+
+function apiProvider(value: unknown, fallback: ImageVisionConfig['api']['provider']): ImageVisionConfig['api']['provider'] {
+  return value === 'anthropic' || value === 'openai' ? value : fallback;
 }

@@ -64,7 +64,19 @@ claude mcp add -s user image-vision -- node C:\absolute\path\to\image-vision-mcp
 claude mcp get image-vision
 ```
 
-4. 重新打开 Claude Code 或开始一个新会话，然后调用 `analyze_image` 工具。成功时，工具返回的可见文本只包含上游模型结果原文；后续追问使用 `structuredContent.session_id`。
+4. 重新打开 Claude Code 或开始一个新会话，然后使用最具体的图片工具。`analyze_image` 只是兼容入口；UI 截图、OCR、错误截图、技术图、图表和 UI 对比都应优先使用专用工具。成功时，工具返回的可见文本只包含上游模型结果原文；后续追问使用 `structuredContent.session_id`。
+
+常用工具选择：
+
+- `ui_to_artifact`：UI 截图、UI 稿、界面稿、网页/应用页面、后台界面、仪表盘 UI。用户说“识别这个 UI 稿”“识别这个界面”“分析这个页面截图”时优先用它；未要求代码时设置 `output_type: "description"`。
+- `extract_text_from_screenshot`：OCR、识别文字、提取文字、代码/终端/文档/界面文字截图。
+- `diagnose_error_screenshot`：错误截图、报错弹窗、异常堆栈截图。
+- `understand_technical_diagram`：架构图、流程图、UML、ER 图、系统图。
+- `analyze_data_visualization`：图表、数据看板、趋势图、柱状图、折线图。
+- `ui_diff_check`：正好两张 UI 截图的视觉差异对比。
+- `image_analysis` / `analyze_image`：没有专用工具适配时的通用图片分析。
+
+调用时直接传用户提供的原始图片路径或图片 URL 到 `source`。不要先用宿主 `Read` 工具读取图片，也不要传临时上传链接、代理链接或包含 `/data-uri/null/` 的 URL。
 
 ## 配置方式
 

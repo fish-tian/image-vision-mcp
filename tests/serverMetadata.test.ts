@@ -25,4 +25,23 @@ describe('analyze_image tool metadata', () => {
     expect(source).toContain("['code', 'prompt', 'spec', 'description']");
     expect(source).not.toContain("name: 'video_analysis'");
   });
+
+  test('steers UI screenshot requests toward ui_to_artifact', async () => {
+    const source = await readFile('src/index.ts', 'utf8');
+
+    expect(source).toContain('Use this for UI screenshots');
+    expect(source).toContain('识别这个 UI 稿');
+    expect(source).toContain('Default to output_type=description');
+    expect(source).toContain('Prefer specialized tools when the image is a UI screenshot');
+    expect(source).toContain('Fallback general-purpose image understanding');
+  });
+
+  test('tells callers to return OCR text verbatim without summarizing', async () => {
+    const source = await readFile('src/index.ts', 'utf8');
+
+    expect(source).toContain('the final assistant response must contain only the extracted text');
+    expect(source).toContain('识别文字');
+    expect(source).toContain('Return only the extracted text.');
+    expect(source).toContain('Do not summarize, explain, translate, rewrite, normalize into bullets');
+  });
 });

@@ -75,6 +75,7 @@ Example:
 ```json
 {
   "api": {
+    "provider": "anthropic",
     "authToken": "",
     "baseUrl": "",
     "model": "",
@@ -120,6 +121,7 @@ Supported environment variables:
 
 | Variable | Required | Default | Description |
 | --- | --- | --- | --- |
+| `VISION_API_PROVIDER` | No | `anthropic` | Upstream API format: `anthropic` for Anthropic Messages or `openai` for OpenAI-compatible chat completions. |
 | `ANTHROPIC_AUTH_TOKEN` | Yes | none | API token used by `@anthropic-ai/sdk`. |
 | `ANTHROPIC_BASE_URL` | No | SDK default | Anthropic-compatible API base URL. |
 | `ANTHROPIC_MODEL` | No | none | Text model used only for model-assisted error diagnosis through the configured Anthropic-compatible SDK endpoint. |
@@ -163,6 +165,19 @@ PowerShell example:
 $env:ANTHROPIC_AUTH_TOKEN="your-token"
 $env:ANTHROPIC_BASE_URL="https://your-compatible-endpoint"
 $env:QWEN_MODEL="openai/qwen3.6-plus"
+```
+
+OpenAI-compatible vision example:
+
+```json
+{
+  "api": {
+    "provider": "openai",
+    "authToken": "your-token",
+    "baseUrl": "https://aihubmix.com/v1",
+    "model": "gemini-3.1-flash-lite"
+  }
+}
 ```
 
 ## Usage
@@ -232,6 +247,8 @@ Parameters:
 
 The visible text returned by each tool contains only the upstream model response. The active `session_id` is returned in `structuredContent.session_id` for follow-up calls.
 
+For OCR requests such as "recognize text", "extract text", "OCR", "识别文字", or "提取文字", callers should return the `extract_text_from_screenshot` visible text verbatim as the final answer. Do not summarize, translate, rewrite, reformat into new bullets, add headings, or explain the document unless the user explicitly asks for analysis after the OCR result.
+
 ### Tools
 
 | Tool | Use |
@@ -280,7 +297,7 @@ OCR example:
 ```json
 {
   "source": "C:\\Users\\you\\Pictures\\terminal-error.png",
-  "prompt": "Keep terminal line breaks intact."
+  "prompt": "Return only the extracted text. Keep terminal line breaks intact."
 }
 ```
 
@@ -375,6 +392,18 @@ Type-check:
 
 ```bash
 bun run typecheck
+```
+
+Manual OpenAI-compatible vision smoke test:
+
+```bash
+bun run scripts/smoke-openai-vision.ts
+```
+
+Pass an image path to test a specific file:
+
+```bash
+bun run scripts/smoke-openai-vision.ts C:\Users\you\Pictures\screenshot.png
 ```
 
 Build:

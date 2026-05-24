@@ -115,14 +115,10 @@ async function callVisionApi(
     throw error;
   }
 
-  const client = new Anthropic({
-    apiKey,
-    baseURL: config.api.baseUrl,
-  });
   const model = config.api.model;
 
   try {
-    logger.info('api', 'requesting image analysis', { model, messageCount: messages.length });
+    logger.info('api', 'requesting image analysis', { provider: config.api.provider, model, messageCount: messages.length });
     await writeCallLog({
       event: 'api.vision.request',
       callId,
@@ -136,13 +132,15 @@ async function callVisionApi(
         ...summarizeApiMessages(messages),
       },
     });
-    const response = await callVisionApiWithFallback(client, {
-      model,
-      max_tokens: config.api.maxTokens,
-      messages,
-    });
+    const response = config.api.provider === 'openai'
+      ? await callOpenAiVisionApi(config, messages)
+      : await callAnthropicVisionApi(config, messages);
 
-    logger.info('api', 'received image analysis', { model, textLength: response.text.length });
+    logger.info('api', 'received image analysis', {
+      provider: config.api.provider,
+      model,
+      textLength: response.text.length,
+    });
     await writeCallLog({
       event: 'api.vision.response',
       callId,
@@ -196,6 +194,7 @@ async function callVisionApi(
 
 function apiConfigForLog(config: ImageVisionConfig): Record<string, unknown> {
   return {
+    provider: config.api.provider,
     baseUrl: config.api.baseUrl || 'sdk-default',
     authToken: config.api.authToken ? '********' : '',
     authTokenConfigured: Boolean(config.api.authToken),
@@ -207,9 +206,36 @@ function apiConfigForLog(config: ImageVisionConfig): Record<string, unknown> {
 
 interface VisionApiResponse {
   text: string;
-  apiMode: 'non-streaming' | 'streaming';
+  apiMode: 'non-streaming' | 'streaming' | 'openai-chat-completions';
   fallbackReason?: string;
-  stop_reason?: Anthropic.Messages.Message['stop_reason'];
+  stop_reason?: Anthropic.Messages.Message['stop_reason'] | string | null;
+  usage?: unknown;
+}
+
+interface OpenAiChatMessage {
+  role: Anthropic.Messages.MessageParam['role'];
+  content: string | Array<OpenAiTextContent | OpenAiImageContent>;
+}
+
+interface OpenAiTextContent {
+  type: 'text';
+  text: string;
+}
+
+interface OpenAiImageContent {
+  type: 'image_url';
+  image_url: {
+    url: string;
+  };
+}
+
+interface OpenAiChatCompletionResponse {
+  choices?: Array<{
+    message?: {
+      content?: string | Array<{ type?: string; text?: string }>;
+    };
+    finish_reason?: string | null;
+  }>;
   usage?: unknown;
 }
 
@@ -236,6 +262,61 @@ async function callVisionApiWithFallback(
       fallbackReason: 'sdk-requires-streaming-for-large-max-tokens',
     };
   }
+}
+
+async function callAnthropicVisionApi(
+  config: ImageVisionConfig,
+  messages: Anthropic.Messages.MessageParam[],
+): Promise<VisionApiResponse> {
+  const client = new Anthropic({
+    apiKey: config.api.authToken,
+    baseURL: config.api.baseUrl,
+  });
+
+  return callVisionApiWithFallback(client, {
+    model: config.api.model,
+    max_tokens: config.api.maxTokens,
+    messages,
+  });
+}
+
+async function callOpenAiVisionApi(
+  config: ImageVisionConfig,
+  messages: Anthropic.Messages.MessageParam[],
+): Promise<VisionApiResponse> {
+  if (!config.api.baseUrl) {
+    throw new ApiError('API_REQUEST_FAILED', 'api.baseUrl is required when api.provider is openai');
+  }
+
+  const response = await fetch(openAiChatCompletionsUrl(config.api.baseUrl), {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${config.api.authToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: config.api.model,
+      max_tokens: config.api.maxTokens,
+      messages: toOpenAiMessages(messages),
+    }),
+  });
+
+  const text = await response.text();
+  const body = parseJson(text);
+  if (!response.ok) {
+    throw Object.assign(new Error(`OpenAI-compatible API request failed: HTTP ${response.status}`), {
+      status: response.status,
+      body,
+    });
+  }
+
+  const completion = body as OpenAiChatCompletionResponse;
+  return {
+    text: extractOpenAiText(completion),
+    apiMode: 'openai-chat-completions',
+    stop_reason: completion.choices?.[0]?.finish_reason ?? null,
+    usage: completion.usage,
+  };
 }
 
 async function callVisionApiStreaming(
@@ -270,6 +351,71 @@ function extractText(response: Anthropic.Messages.Message): string {
     .filter(Boolean)
     .join('\n')
     .trim();
+}
+
+function toOpenAiMessages(messages: Anthropic.Messages.MessageParam[]): OpenAiChatMessage[] {
+  return messages.map((message) => {
+    if (typeof message.content === 'string') {
+      return {
+        role: message.role,
+        content: message.content,
+      };
+    }
+
+    const content = message.content.map((block) => {
+      if (block.type === 'text') {
+        return {
+          type: 'text' as const,
+          text: block.text,
+        };
+      }
+
+      if (block.type === 'image' && block.source.type === 'base64') {
+        return {
+          type: 'image_url' as const,
+          image_url: {
+            url: `data:${block.source.media_type};base64,${block.source.data}`,
+          },
+        };
+      }
+
+      throw new ApiError('API_REQUEST_FAILED', `Unsupported content block for OpenAI-compatible provider: ${block.type}`);
+    });
+
+    return {
+      role: message.role,
+      content,
+    };
+  });
+}
+
+function openAiChatCompletionsUrl(baseUrl: string): string {
+  return `${baseUrl.replace(/\/+$/, '')}/chat/completions`;
+}
+
+function extractOpenAiText(response: OpenAiChatCompletionResponse): string {
+  const content = response.choices?.[0]?.message?.content;
+  if (typeof content === 'string') {
+    return content.trim();
+  }
+
+  if (Array.isArray(content)) {
+    return content
+      .map((part) => (part.type === 'text' || part.type === undefined ? part.text ?? '' : ''))
+      .filter(Boolean)
+      .join('\n')
+      .trim();
+  }
+
+  return '';
+}
+
+function parseJson(text: string): unknown {
+  try {
+    return JSON.parse(text);
+  } catch {
+    return text;
+  }
 }
 
 function isStreamingRequiredError(error: unknown): boolean {

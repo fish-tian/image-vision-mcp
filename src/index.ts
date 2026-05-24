@@ -53,25 +53,35 @@ const GENERAL_SOURCE_POLICY = [
   'Do not call a host Read tool first and do not pass generated temporary URLs, upload proxy URLs, data-uri/null URLs, or guessed URLs.',
   'Continue follow-up questions with session_id.',
   'On success, present content[0].text exactly as returned by the upstream vision model.',
-  'Do not summarize, translate, rewrite, reformat, add headings, or append session_id.',
+  'Do not summarize, translate, rewrite, reformat, add headings, infer intent, or append session_id.',
   'Use structuredContent.session_id only for follow-up tool calls.',
+].join(' ');
+
+const OCR_CALLING_POLICY = [
+  'For OCR requests such as "recognize text", "extract text", "OCR", "识别文字", or "提取文字", the final assistant response must contain only the extracted text returned in content[0].text.',
+  'Do not add introductions, summaries, bullet normalization, Markdown headings, document interpretation, or UX analysis unless the user explicitly asks for that after the OCR result.',
 ].join(' ');
 
 const visionTools: VisionToolDefinition[] = [
   {
     name: 'image_analysis',
     title: 'Image analysis',
-    description: 'General-purpose image understanding when no specialized image vision tool fits.',
+    description: 'Fallback general-purpose image understanding. Use this only when no specialized image vision tool fits.',
     defaultPrompt: 'Analyze the image content in detail. Describe visible objects, text, layout, context, and notable details.',
   },
   {
     name: 'extract_text_from_screenshot',
     title: 'Extract text from screenshot',
-    description: 'OCR screenshots for code, terminals, documents, interfaces, and general visible text.',
+    description: [
+      'OCR screenshots for code, terminals, documents, interfaces, and general visible text.',
+      OCR_CALLING_POLICY,
+    ].join(' '),
     defaultPrompt: [
       'Extract all visible text from the screenshot.',
-      'Preserve line breaks and reading order as much as possible.',
+      'Return only the extracted text.',
+      'Preserve original wording, punctuation, spacing, indentation, line breaks, and reading order as much as possible.',
       'For code or terminal output, keep indentation, symbols, and error text intact.',
+      'Do not summarize, explain, translate, rewrite, normalize into bullets, add Markdown headings, or interpret the document.',
       'If some text is unclear, mark it as uncertain instead of inventing content.',
     ].join(' '),
   },
@@ -108,7 +118,11 @@ const visionTools: VisionToolDefinition[] = [
   {
     name: 'ui_to_artifact',
     title: 'UI to artifact',
-    description: 'Turn UI screenshots into code, prompts, specs, or descriptions.',
+    description: [
+      'Use this for UI screenshots, UI mockups, app screens, web pages, dashboards, admin panels, design comps, wireframes, and requests to identify or analyze a UI draft.',
+      'This includes Chinese requests such as "识别这个 UI 稿", "识别这个界面", "分析这个页面截图", "还原这个后台界面", and "看这个仪表盘 UI".',
+      'Turn UI screenshots into code, prompts, specs, or descriptions. Default to output_type=description when the user asks to identify, recognize, or analyze a UI without requesting code.',
+    ].join(' '),
     inputSchema: uiToArtifactInputSchema,
     defaultPrompt: ({ output_type }) => {
       const type = output_type || 'description';
@@ -158,7 +172,8 @@ export function createServer(): McpServer {
     {
       title: 'Analyze image',
       description: [
-        'Analyze one or more images by directly reading the original source path or URL.',
+        'Compatibility fallback for analyzing one or more images by directly reading the original source path or URL.',
+        'Prefer specialized tools when the image is a UI screenshot, OCR target, error screenshot, technical diagram, chart, dashboard, or UI diff.',
         GENERAL_SOURCE_POLICY,
       ].join(' '),
       inputSchema: analyzeImageInputSchema,

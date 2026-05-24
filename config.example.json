@@ -1,5 +1,6 @@
 {
   "api": {
+    "provider": "anthropic",
     "authToken": "",
     "baseUrl": "",
     "model": "",

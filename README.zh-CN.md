@@ -2,7 +2,7 @@
 
 [English](./README.md)
 
-`image-vision-mcp` 是一个 MCP Server，通过 `analyze_image` 工具为不支持多模态的模型补充图片分析能力。它支持本地图片、远程图片 URL、多图分析，以及基于 `session_id` 的多轮追问。
+`image-vision-mcp` 是一个 MCP Server，通过一组图片理解工具为不支持多模态的模型补充图片分析能力。它支持本地图片、远程图片 URL、多图分析，以及基于 `session_id` 的多轮追问。`analyze_image` 保留为兼容入口；实际使用时应优先选择更具体的专用工具。
 
 ## 功能
 
@@ -148,9 +148,30 @@ IMAGE_VISION_CONFIG=/path/to/config.json
 
 ## 使用方式
 
-MCP 工具名：
+MCP 工具会直接读取用户提供的原始图片路径或图片 URL。不要先用宿主 `Read` 工具读取图片，也不要传入临时上传链接、代理链接或包含 `/data-uri/null/` 的 URL。
+
+优先使用最具体的工具：
+
+| 工具 | 适用场景 |
+| --- | --- |
+| `ui_to_artifact` | UI 截图、UI 稿、界面稿、网页/应用页面、后台界面、仪表盘 UI；用户说“识别这个 UI 稿”“分析这个页面截图”时默认使用，未要求代码时用 `output_type: "description"`。 |
+| `extract_text_from_screenshot` | OCR、识别文字、提取文字、代码/终端/文档/界面文字截图。 |
+| `diagnose_error_screenshot` | 错误截图、报错弹窗、异常堆栈截图。 |
+| `understand_technical_diagram` | 架构图、流程图、UML、ER 图、系统图。 |
+| `analyze_data_visualization` | 图表、数据看板、趋势图、柱状图、折线图。 |
+| `ui_diff_check` | 对比两张 UI 截图的视觉差异。 |
+| `image_analysis` / `analyze_image` | 没有专用工具适配时的通用图片分析。 |
+
+可用工具名包括：
 
 ```text
+image_analysis
+extract_text_from_screenshot
+diagnose_error_screenshot
+understand_technical_diagram
+analyze_data_visualization
+ui_to_artifact
+ui_diff_check
 analyze_image
 ```
 
@@ -160,6 +181,16 @@ analyze_image
 {
   "source": "C:\\Users\\you\\Pictures\\example.png",
   "prompt": "请详细描述这张图片。"
+}
+```
+
+UI 稿识别：
+
+```json
+{
+  "source": "C:\\Users\\you\\Pictures\\dashboard-ui.png",
+  "output_type": "description",
+  "prompt": "识别这个 UI 稿。"
 }
 ```
 

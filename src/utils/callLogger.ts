@@ -17,7 +17,18 @@ const SENSITIVE_EXACT_KEYS = new Set([
   'sig',
   'credential',
 ]);
-const NON_SECRET_TOKEN_KEYS = new Set(['maxtoken', 'maxtokens', 'inputtokens', 'outputtokens']);
+const NON_SECRET_TOKEN_KEYS = new Set([
+  'maxtoken',
+  'maxtokens',
+  'inputtokens',
+  'outputtokens',
+  'prompttokens',
+  'completiontokens',
+  'totaltokens',
+  'imagetokens',
+  'cachedtokens',
+  'reasoningtokens',
+]);
 const NON_SECRET_AUTH_KEYS = new Set(['authtokenconfigured', 'authtokensource']);
 const IMAGE_DATA_KEYS = new Set(['base64', 'data', 'bin', 'binary']);
 const MAX_ERROR_DEPTH = 4;

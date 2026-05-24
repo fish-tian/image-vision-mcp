@@ -92,6 +92,8 @@ Use:
 - `ui_diff_check` for exactly two UI screenshots.
 - `image_analysis` or `analyze_image` for general image analysis.
 
+For OCR requests such as "recognize text", "extract text", "OCR", "识别文字", or "提取文字", call `extract_text_from_screenshot` and make the final assistant response exactly the visible tool text. Do not summarize, translate, rewrite, normalize bullet formatting, add headings, or explain the document unless the user explicitly asks for analysis after OCR.
+
 Correct:
 
 ```json

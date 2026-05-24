@@ -24,6 +24,7 @@ describe('config', () => {
   test('uses built-in defaults when config file is missing', () => {
     const config = getConfig();
 
+    expect(config.api.provider).toBe('anthropic');
     expect(config.api.model).toBe('openai/qwen3.6-plus');
     expect(config.api.maxTokens).toBe(64_000);
     expect(config.api.authToken).toBe('');
@@ -44,6 +45,7 @@ describe('config', () => {
   test('reads nested values from config file', async () => {
     await writeJson(tempConfigPath, {
       api: {
+        provider: 'openai',
         authToken: 'file-token',
         baseUrl: 'https://example.test',
         model: 'file-model',
@@ -80,6 +82,7 @@ describe('config', () => {
     const config = getConfig();
 
     expect(config.api.authToken).toBe('file-token');
+    expect(config.api.provider).toBe('openai');
     expect(config.api.authTokenSource).toBe('config');
     expect(config.api.baseUrl).toBe('https://example.test');
     expect(config.api.model).toBe('file-model');
@@ -104,6 +107,7 @@ describe('config', () => {
   test('non-empty config values override environment variables', async () => {
     await writeJson(tempConfigPath, {
       api: {
+        provider: 'anthropic',
         authToken: 'file-token',
         baseUrl: 'https://file.test',
         model: 'file-model',
@@ -119,6 +123,7 @@ describe('config', () => {
       },
     });
     process.env.ANTHROPIC_AUTH_TOKEN = 'env-token';
+    process.env.VISION_API_PROVIDER = 'openai';
     process.env.ANTHROPIC_BASE_URL = 'https://env.test';
     process.env.QWEN_MODEL = 'env-model';
     process.env.ANTHROPIC_MODEL = 'env-diagnostic-model';
@@ -132,6 +137,7 @@ describe('config', () => {
     const config = getConfig();
 
     expect(config.api.authToken).toBe('file-token');
+    expect(config.api.provider).toBe('anthropic');
     expect(config.api.authTokenSource).toBe('config');
     expect(config.api.baseUrl).toBe('https://file.test');
     expect(config.api.model).toBe('file-model');
@@ -145,6 +151,7 @@ describe('config', () => {
 
   test('uses environment variables when config file is missing', () => {
     process.env.ANTHROPIC_AUTH_TOKEN = 'env-token';
+    process.env.VISION_API_PROVIDER = 'openai';
     process.env.ANTHROPIC_BASE_URL = 'https://env.test';
     process.env.QWEN_MODEL = 'env-model';
     process.env.ANTHROPIC_MODEL = 'env-diagnostic-model';
@@ -160,6 +167,7 @@ describe('config', () => {
     const config = getConfig();
 
     expect(config.api.authToken).toBe('env-token');
+    expect(config.api.provider).toBe('openai');
     expect(config.api.authTokenSource).toBe('env');
     expect(config.api.baseUrl).toBe('https://env.test');
     expect(config.api.model).toBe('env-model');
@@ -205,6 +213,7 @@ describe('config', () => {
   test('invalid numeric and log values fall back to defaults', async () => {
     await writeJson(tempConfigPath, {
       api: {
+        provider: 'invalid',
         maxTokens: -1,
       },
       cache: {
@@ -224,6 +233,7 @@ describe('config', () => {
     const config = getConfig();
 
     expect(config.api.maxTokens).toBe(64_000);
+    expect(config.api.provider).toBe('anthropic');
     expect(config.cache.ttlHours).toBe(24);
     expect(config.image.maxBytes).toBe(20 * 1024 * 1024);
     expect(config.log.level).toBe('info');
